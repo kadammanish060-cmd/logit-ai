@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Modal,
+  Image,
 } from 'react-native';
 import * as db from './services/db';
 import { processVoiceInput } from './services/gemini';
@@ -191,6 +192,11 @@ export default function App() {
 
   // Editing Entry Modal
   const [editModalVisible, setEditModalVisible] = useState(false);
+  // Invoice sharing states
+  const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
+  const [invoiceImageUrl, setInvoiceImageUrl] = useState<string | null>(null);
+  const [sharingShopName, setSharingShopName] = useState('');
+  const [sharingDate, setSharingDate] = useState('');
   const [editingEntry, setEditingEntry] = useState<{
     shopId: string;
     date: string;
@@ -749,6 +755,135 @@ export default function App() {
     setEditingEntry(null);
   };
 
+  const handleGenerateAndShareInvoice = (shopName: string, date: string) => {
+    if (typeof document === 'undefined') return;
+    const shop = shops.find(s => s.name === shopName);
+    const ledger = db.getLedger(shopName, date);
+    if (!shop || !ledger) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 750;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 600, 750);
+
+    // Draw border
+    ctx.strokeStyle = '#1a237e';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(5, 5, 590, 740);
+
+    // Draw internal thin border
+    ctx.strokeStyle = '#283593';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(15, 15, 570, 720);
+
+    // Header
+    ctx.fillStyle = '#1a237e';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(language === 'mr' ? 'लॉगीट एआय - बिल पत्रक' : 'LOGIT AI - INVOICE', 300, 70);
+
+    ctx.fillStyle = '#757575';
+    ctx.font = '14px Arial';
+    ctx.fillText(language === 'mr' ? 'खरेदी आणि विक्रीचे खाते' : 'OFFLINE BOOKKEEPING SYSTEM', 300, 95);
+
+    // Invoice Details
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(`${language === 'mr' ? 'ग्राहक (दुकान)' : 'Shop'}: ${shopName}`, 50, 150);
+    ctx.fillText(`${language === 'mr' ? 'दिनांक' : 'Date'}: ${date}`, 50, 180);
+    ctx.fillText(`${language === 'mr' ? 'स्थिती' : 'Status'}: ${language === 'mr' ? 'लॉक आणि फायनल' : 'Locked & Finalized'}`, 50, 210);
+
+    // Draw table header
+    ctx.fillStyle = '#1a237e';
+    ctx.fillRect(50, 240, 500, 35);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(language === 'mr' ? 'वस्तू' : 'Item', 70, 262);
+    ctx.fillText(language === 'mr' ? 'प्रमाण (Qty)' : 'Qty', 250, 262);
+    ctx.fillText(language === 'mr' ? 'दर (Rate)' : 'Rate', 370, 262);
+    ctx.fillText(language === 'mr' ? 'एकूण (Total)' : 'Total', 470, 262);
+
+    // Draw table items
+    let y = 310;
+    ctx.fillStyle = '#333333';
+    ctx.font = '14px Arial';
+    Object.values(ledger.items).forEach((item) => {
+      ctx.fillText(item.itemName, 70, y);
+      ctx.fillText(item.quantity.toString(), 250, y);
+      ctx.fillText(`₹${item.unitPrice ?? 0}`, 370, y);
+      ctx.fillText(`₹${item.lineTotal ?? 0}`, 470, y);
+      
+      // Draw thin row separator line
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(50, y + 10);
+      ctx.lineTo(550, y + 10);
+      ctx.stroke();
+      
+      y += 40;
+    });
+
+    // Draw Totals section
+    y += 20;
+    ctx.strokeStyle = '#1a237e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(50, y);
+    ctx.lineTo(550, y);
+    ctx.stroke();
+
+    y += 30;
+    ctx.fillStyle = '#2e7d32';
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText(language === 'mr' ? 'एकूण रक्कम (Grand Total):' : 'Grand Total:', 50, y);
+    ctx.fillText(`₹${ledger.totalBill ?? 0}`, 450, y);
+
+    y += 35;
+    ctx.fillStyle = '#e65100';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(`${language === 'mr' ? 'दुकानाची बाकी रक्कम (Outstanding)' : 'Total Outstanding Balance'}:`, 50, y);
+    ctx.fillText(`₹${shop.outstandingBalance}`, 450, y);
+
+    // Draw footer note
+    y += 60;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#757575';
+    ctx.font = 'italic 12px Arial';
+    ctx.fillText(language === 'mr' ? 'लॉगीट एआय वापरल्याबद्दल धन्यवाद!' : 'Thank you for using Logit AI!', 300, y);
+
+    // Convert to base64 image URL
+    const dataUrl = canvas.toDataURL('image/png');
+    setInvoiceImageUrl(dataUrl);
+    setSharingShopName(shopName);
+    setSharingDate(date);
+    setInvoiceModalVisible(true);
+
+    // Trigger actual native share if available
+    const nav = typeof navigator !== 'undefined' ? navigator : null;
+    if (nav && nav.share) {
+      fetch(dataUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], `Invoice-${shopName}-${date}.png`, { type: 'image/png' });
+          if (nav.canShare && nav.canShare({ files: [file] })) {
+            nav.share({
+              files: [file],
+              title: `Invoice for ${shopName}`,
+              text: `Here is the invoice for ${shopName} on ${date}.`
+            }).catch(err => console.log('Share failed', err));
+          }
+        });
+    }
+  };
+
   const handleResetData = () => {
     if (confirm("Are you sure you want to clear all data? This will reset to default setup.")) {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -994,6 +1129,16 @@ export default function App() {
                           </TouchableOpacity>
                         </View>
                       ))}
+                      {ledger.status === 'locked' && (
+                        <TouchableOpacity
+                          style={styles.generateInvoiceBtn}
+                          onPress={() => handleGenerateAndShareInvoice(shop.name, selectedDate)}
+                        >
+                          <Text style={styles.generateInvoiceBtnText}>
+                            📤 {t.generateInvoiceBtn}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ) : (
                     <Text style={styles.emptyText}>{t.noEntries}</Text>
@@ -1233,6 +1378,57 @@ export default function App() {
                 </View>
               </View>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invoice sharing modal */}
+      <Modal visible={invoiceModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {language === 'mr' ? 'इनव्हॉइस प्रीव्ह्यू' : 'Invoice Preview'}
+            </Text>
+            {invoiceImageUrl && (
+              <View style={{ alignItems: 'center', marginVertical: 12 }}>
+                <Image 
+                  source={{ uri: invoiceImageUrl }} 
+                  style={{ width: '100%', height: 350, resizeMode: 'contain', borderWidth: 1, borderColor: '#ccc' }} 
+                />
+              </View>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: '#2e7d32' }]} 
+                onPress={() => {
+                  const nav = typeof navigator !== 'undefined' ? navigator : null;
+                  if (nav && nav.share && invoiceImageUrl) {
+                    fetch(invoiceImageUrl)
+                      .then(res => res.blob())
+                      .then(blob => {
+                        const file = new File([blob], `Invoice-${sharingShopName}-${sharingDate}.png`, { type: 'image/png' });
+                        if (nav.canShare && nav.canShare({ files: [file] })) {
+                          nav.share({
+                            files: [file],
+                            title: `Invoice for ${sharingShopName}`,
+                            text: `Here is the invoice for ${sharingShopName} on ${sharingDate}.`
+                          }).catch(err => console.log('Share failed', err));
+                        }
+                      });
+                  } else {
+                    alert(language === 'mr' ? 'शेअर करणे उपलब्ध नाही' : 'Sharing is not supported on this browser');
+                  }
+                }}
+              >
+                <Text style={styles.modalBtnText}>{language === 'mr' ? 'शेअर करा' : 'Share'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: '#757575' }]} 
+                onPress={() => setInvoiceModalVisible(false)}
+              >
+                <Text style={styles.modalBtnText}>{language === 'mr' ? 'बंद करा' : 'Close'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1790,6 +1986,18 @@ const styles = StyleSheet.create({
   resetBtnText: {
     color: '#c62828',
     fontWeight: 'bold',
+  },
+  generateInvoiceBtn: {
+    backgroundColor: '#1b4332',
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  generateInvoiceBtnText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   modalOverlay: {
     flex: 1,
