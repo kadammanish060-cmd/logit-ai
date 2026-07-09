@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   StyleSheet,
@@ -33,7 +33,7 @@ const TRANSLATIONS = {
     micProcessing: "Processing your voice...",
     voiceCommandPlaceholder: "Type voice command here (or use mic)...",
     sendBtn: "Send",
-    callBtn: "Morning/Night Call",
+    callBtn: "Start On-Demand Call 📞",
     quickNoteTitle: "Quick Voice Note",
     ledgerTitle: "Business Ledger",
     noEntries: "No entries recorded for this date.",
@@ -64,6 +64,25 @@ const TRANSLATIONS = {
     roleLabel: "Role",
     langLabel: "Language",
     resetData: "Reset All Database",
+    
+    // Phase 4 Call translation keys
+    incomingCall: "Incoming Call...",
+    morningCallTitle: "Morning Purchase Call",
+    nightCallTitle: "Night Pricing Call",
+    onDemandCallTitle: "On-demand Assistant Call",
+    acceptBtn: "Accept ✅",
+    declineBtn: "Decline ❌",
+    endCallBtn: "End Call 🔴",
+    simTimeLabel: "Simulated Clock",
+    timeWarp15: "+15 Min ⏩",
+    timeWarp30: "+30 Min ⏩",
+    triggerMorningCall: "Trigger 10:00 AM Call ⏰",
+    triggerNightCall: "Trigger 9:00 PM Call ⏰",
+    retryBanner: "Scheduled retry in",
+    minutes: "minutes",
+    missedCallAlert: "Missed Call from Logit Assistant",
+    callDoneBtn: "Say 'Done' / संपले",
+    callYesBtn: "Say 'Yes' / होय",
   },
   mr: {
     appTitle: "लॉगीट एआय",
@@ -83,8 +102,8 @@ const TRANSLATIONS = {
     micProcessing: "तुमचा आवाज समजून घेत आहे...",
     voiceCommandPlaceholder: "व्हॉइस कमांड टाईप करा (किंवा माइक वापरा)...",
     sendBtn: "पाठवा",
-    callBtn: "सकाळ/रात्र कॉल",
-    quickNoteTitle: "क्विक व्हॉइस नोट",
+    callBtn: "कॉल सुरू करा 📞",
+    quickNoteTitle: "क्लिक व्हॉइस नोट",
     ledgerTitle: "व्यवसाय लेजर",
     noEntries: "या तारखेसाठी कोणतीही नोंद आढळली नाही.",
     approvalsTitle: "मंजुरीसाठी प्रलंबित",
@@ -114,8 +133,42 @@ const TRANSLATIONS = {
     roleLabel: "भूमिका",
     langLabel: "भाषा",
     resetData: "सर्व डेटा डिलीट करा",
+
+    // Phase 4 Call translation keys
+    incomingCall: "इनकमिंग कॉल...",
+    morningCallTitle: "सकाळची खरेदी नोंदणी",
+    nightCallTitle: "रात्रीची दर नोंदणी",
+    onDemandCallTitle: "असिस्टंट कॉल",
+    acceptBtn: "स्वीकारा ✅",
+    declineBtn: "नाकारा ❌",
+    endCallBtn: "कॉल संपवा 🔴",
+    simTimeLabel: "सिम्युलेटेड घड्याळ",
+    timeWarp15: "+१५ मिनिटे ⏩",
+    timeWarp30: "+३० मिनिटे ⏩",
+    triggerMorningCall: "सकाळी १०:०० कॉल सुरू करा ⏰",
+    triggerNightCall: "रात्री ९:०० कॉल सुरू करा ⏰",
+    retryBanner: "पुन्हा कॉल नियोजित आहे",
+    minutes: "मिनिटांत",
+    missedCallAlert: "लॉगीट असिस्टंटकडून मिस्ड कॉल",
+    callDoneBtn: "Say 'Done' / संपले",
+    callYesBtn: "Say 'Yes' / होय",
   }
 };
+
+interface CallSession {
+  type: "morning" | "night" | "on_demand";
+  status: "ringing" | "active" | "ended" | "missed";
+  duration: number; // seconds
+  callerName: string;
+  aiUtterance: string;
+  userSpeech: string;
+  // State Machine pointers for interactive scripts
+  stepIndex: number;
+  shopIndex: number;
+  itemIndex: number;
+  tempPurchases: { itemName: string; quantity: number; pricePaid: number }[];
+  tempPrices: { shopName: string; itemName: string; price: number }[];
+}
 
 export default function App() {
   // Onboarding Settings
@@ -147,14 +200,23 @@ export default function App() {
     unitPrice: number | null;
   } | null>(null);
 
-  // Settings inputs
-  const [newShopName, setNewShopName] = useState('');
-  const [newItemName, setNewItemName] = useState('');
-
   // Loaded database lists
   const [shops, setShops] = useState<db.Shop[]>([]);
   const [items, setItems] = useState<db.CanonicalItem[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<db.PendingApproval[]>([]);
+
+  // --- Phase 4: Simulated Scheduler & Call Mode State ---
+  const [simulatedHour, setSimulatedHour] = useState(9); // starts at 9:00 AM
+  const [simulatedMinute, setSimulatedMinute] = useState(45); // 9:45 AM
+  const [activeCall, setActiveCall] = useState<CallSession | null>(null);
+  
+  // Retry timers (in minutes relative to simulated clock)
+  const [retryCallType, setRetryCallType] = useState<"morning" | "night" | null>(null);
+  const [retryTimeRemaining, setRetryTimeRemaining] = useState<number | null>(null); // in simulated minutes
+
+  // Active call duration timer reference
+  const callTimerRef = useRef<any>(null);
+  const ringingTimeoutRef = useRef<any>(null);
 
   // Load database on start
   useEffect(() => {
@@ -209,7 +271,7 @@ export default function App() {
     }
   };
 
-  // Quick Voice Note activation
+  // Quick Voice Note mic handler
   const handleMicPress = () => {
     if (isListening) {
       setIsListening(false);
@@ -232,7 +294,6 @@ export default function App() {
       language
     );
 
-    // Auto-stop listening after 6 seconds if no results (fallback)
     setTimeout(() => {
       if (isListening) {
         setIsListening(false);
@@ -241,7 +302,6 @@ export default function App() {
     }, 6000);
   };
 
-  // Submit Text/Voice Command to AI
   const submitTextInput = async (inputStr: string) => {
     if (!inputStr.trim()) return;
     setIsProcessing(true);
@@ -250,16 +310,398 @@ export default function App() {
     try {
       const result = await processVoiceInput(inputStr, role, language);
       setAiSpeechOutput(result.responseText);
-      
-      // Speak the response using Speech Synthesis
       synthesizeSpeech(result.responseText, language);
-      
       refreshData();
     } catch (e) {
       console.error(e);
     } finally {
       setIsProcessing(false);
       setTextCommand('');
+    }
+  };
+
+  // --- Phase 4 Call Mode State Machine Scripts ---
+
+  // Helper to format simulated clock display
+  const getFormattedSimTime = () => {
+    const hh = simulatedHour.toString().padStart(2, '0');
+    const mm = simulatedMinute.toString().padStart(2, '0');
+    const period = simulatedHour >= 12 ? "PM" : "AM";
+    const displayHour = simulatedHour > 12 ? simulatedHour - 12 : simulatedHour === 0 ? 12 : simulatedHour;
+    return `${displayHour.toString().padStart(2, '0')}:${mm} ${period}`;
+  };
+
+  // Start Ringing state
+  const initiateRinging = (type: "morning" | "night" | "on_demand") => {
+    if (activeCall) return;
+
+    let callerName = "";
+    let initialGreeting = "";
+
+    if (type === "morning") {
+      callerName = TRANSLATIONS[language].morningCallTitle;
+      initialGreeting = language === "mr" 
+        ? "नमस्कार! आजची सकाळची खरेदी नोंदवूया. तुम्ही आज काय खरेदी केले?" 
+        : "Hello! Let's log today's morning purchases. What did you buy?";
+    } else if (type === "night") {
+      callerName = TRANSLATIONS[language].nightCallTitle;
+      
+      // Look up what needs pricing today
+      const unpriced = db.getUnpricedItems(selectedDate);
+      const hasUnpriced = Object.keys(unpriced).length > 0;
+
+      if (!hasUnpriced) {
+        initialGreeting = language === "mr" 
+          ? "नमस्कार! आजच्या सर्व डिलिव्हरीची किंमत आधीच सेट केली आहे. आज रात्रीचे कोणतेही बिल प्रलंबित नाही. शुभ रात्री!" 
+          : "Hello! All deliveries for today are already priced. There are no pending bills tonight. Good night!";
+      } else {
+        // Collect first shop item
+        const firstShop = Object.keys(unpriced)[0];
+        const firstItem = unpriced[firstShop][0];
+        initialGreeting = language === "mr" 
+          ? `नमस्कार! चला आजचे दर सेट करूया. ${firstShop} साठी, आपण ${firstItem} पोहोचवले आहे. त्याची काय किंमत ठरली?` 
+          : `Hello! Let's set prices for today's deliveries. For ${firstShop}, we delivered ${firstItem}. What is the price?`;
+      }
+    } else {
+      callerName = TRANSLATIONS[language].onDemandCallTitle;
+      initialGreeting = language === "mr"
+        ? "हो, बोला! मी ऐकत आहे. काय नोंदवू?"
+        : "Yes, I am listening. What would you like to log?";
+    }
+
+    const session: CallSession = {
+      type,
+      status: "ringing",
+      duration: 0,
+      callerName,
+      aiUtterance: initialGreeting,
+      userSpeech: "",
+      stepIndex: 0,
+      shopIndex: 0,
+      itemIndex: 0,
+      tempPurchases: [],
+      tempPrices: []
+    };
+
+    setActiveCall(session);
+
+    // Unanswered call timeout: if ringing is ignored for 15 seconds, trigger missed call
+    ringingTimeoutRef.current = setTimeout(() => {
+      handleMissedCall(type);
+    }, 15000);
+  };
+
+  // Ringing declined -> retry in 30 minutes
+  const handleDeclineCall = () => {
+    if (!activeCall) return;
+    
+    const callType = activeCall.type;
+    
+    // Clear ringing timeout
+    if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
+
+    setActiveCall(null);
+
+    if (callType !== "on_demand") {
+      setRetryCallType(callType);
+      setRetryTimeRemaining(30); // 30 minutes retry for declined
+    }
+  };
+
+  // Ringing unanswered -> retry in 15 minutes
+  const handleMissedCall = (type: "morning" | "night" | "on_demand") => {
+    if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
+
+    setActiveCall({
+      type,
+      status: "missed",
+      duration: 0,
+      callerName: TRANSLATIONS[language].incomingCall,
+      aiUtterance: TRANSLATIONS[language].missedCallAlert,
+      userSpeech: "",
+      stepIndex: 0,
+      shopIndex: 0,
+      itemIndex: 0,
+      tempPurchases: [],
+      tempPrices: []
+    });
+
+    if (type !== "on_demand") {
+      setRetryCallType(type);
+      setRetryTimeRemaining(15); // 15 minutes retry for unanswered
+    }
+
+    // Dismiss the missed call notification after 4 seconds
+    setTimeout(() => {
+      setActiveCall(current => current?.status === "missed" ? null : current);
+    }, 4000);
+  };
+
+  // Ringing accepted -> active call
+  const handleAcceptCall = () => {
+    if (!activeCall) return;
+    
+    // Clear ringing timeout
+    if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
+
+    const activeSession: CallSession = {
+      ...activeCall,
+      status: "active"
+    };
+
+    setActiveCall(activeSession);
+    
+    // Synthesize initial greeting speech
+    synthesizeSpeech(activeSession.aiUtterance, language);
+
+    // Start timer incrementer
+    callTimerRef.current = setInterval(() => {
+      setActiveCall(curr => {
+        if (curr && curr.status === "active") {
+          return { ...curr, duration: curr.duration + 1 };
+        }
+        return curr;
+      });
+    }, 1000);
+  };
+
+  // End active call
+  const handleEndCall = () => {
+    if (callTimerRef.current) clearInterval(callTimerRef.current);
+    if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
+    
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    setActiveCall(null);
+    refreshData();
+  };
+
+  // Interactive Call voice responder (state machine interface)
+  const handleCallVoiceInput = async (spokenText: string) => {
+    if (!activeCall || activeCall.status !== "active") return;
+    
+    const query = spokenText.toLowerCase().trim();
+    const numbers = query.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+    
+    let nextUtterance = "";
+    let nextStepIndex = activeCall.stepIndex;
+    let nextShopIndex = activeCall.shopIndex;
+    let nextItemIndex = activeCall.itemIndex;
+    let nextTempPurchases = [...activeCall.tempPurchases];
+    let isDone = false;
+
+    // --- MORNING CALL STATE MACHINE ---
+    if (activeCall.type === "morning") {
+      // Step 0: capturing items
+      if (nextStepIndex === 0) {
+        const isDoneCommand = query.includes("done") || query.includes("that's all") || 
+                             query.includes("संपले") || query.includes("झालं");
+        
+        if (isDoneCommand) {
+          // Move to confirmation step
+          if (nextTempPurchases.length === 0) {
+            nextUtterance = language === "mr"
+              ? "तुम्ही कोणतीही खरेदी नोंदवली नाही. खरेदी नोंदवायची आहे का?"
+              : "You haven't logged any purchases yet. Would you like to log one?";
+          } else {
+            const summaryStr = nextTempPurchases.map(p => `${p.quantity} ${p.itemName}`).join(", ");
+            nextUtterance = language === "mr"
+              ? `तुमची आजची एकूण खरेदी: ${summaryStr}. हे बरोबर आहे का? 'होय' किंवा 'नाही' म्हणा.`
+              : `Confirming today's purchases: ${summaryStr}. Is this correct? Say 'yes' or 'no'.`;
+            nextStepIndex = 1; // confirmation step
+          }
+        } else {
+          // Extract item and numbers
+          const matchedItem = items.find(i => query.includes(i.name.toLowerCase()) || i.aliases.some(a => query.includes(a.toLowerCase())));
+          
+          if (matchedItem && numbers.length >= 2) {
+            const qty = numbers[0];
+            const price = numbers[1];
+            
+            nextTempPurchases.push({
+              itemName: matchedItem.name,
+              quantity: qty,
+              pricePaid: price
+            });
+
+            nextUtterance = language === "mr"
+              ? `नोंद केली: ${qty} ${matchedItem.name} ₹${price} मध्ये. पुढे सांगा किंवा 'संपले' म्हणा.`
+              : `Recorded ${qty} units of ${matchedItem.name} for ₹${price}. Anything else?`;
+          } else {
+            nextUtterance = language === "mr"
+              ? "कृपया वस्तूचे नाव, वजन (संख्या) आणि किंमत सांगा. उदाहरणार्थ: '१० बटाटे शंभर रुपये'."
+              : "Please specify the item name, quantity, and total price paid. E.g. '10 potato for 100 rupees'.";
+          }
+        }
+      } 
+      // Step 1: Confirmation
+      else if (nextStepIndex === 1) {
+        if (query.includes("yes") || query.includes("हो") || query.includes("बरोबर")) {
+          // Save all purchases to database
+          nextTempPurchases.forEach(p => {
+            db.logPurchase(selectedDate, p.itemName, p.quantity, p.pricePaid);
+          });
+          nextUtterance = language === "mr"
+            ? "सर्व खरेदी यशस्वीरित्या जतन केली आहे. धन्यवाद, कॉल संपवत आहे!"
+            : "All purchases have been saved successfully. Thank you, goodbye!";
+          isDone = true;
+        } else {
+          // Reset
+          nextTempPurchases = [];
+          nextStepIndex = 0;
+          nextUtterance = language === "mr"
+            ? "ठीक आहे, आपण पुन्हा सुरू करूया. खरेदी सांगा."
+            : "No problem. Let's restart. Please say your purchases.";
+        }
+      }
+    }
+    
+    // --- NIGHT PRICING CALL STATE MACHINE ---
+    else if (activeCall.type === "night") {
+      const unpriced = db.getUnpricedItems(selectedDate);
+      const shopsList = Object.keys(unpriced);
+      
+      if (shopsList.length === 0) {
+        nextUtterance = language === "mr"
+          ? "सर्व दर सेट केले आहेत. धन्यवाद!"
+          : "All prices are set. Thank you!";
+        isDone = true;
+      } else {
+        const currentShopName = shopsList[nextShopIndex];
+        const itemsList = unpriced[currentShopName];
+        const currentItemName = itemsList[nextItemIndex];
+
+        if (nextStepIndex === 0) {
+          // Step 0: capturing price
+          const price = numbers[0];
+          if (price) {
+            // Apply price setting in database
+            db.setPrice(currentShopName, selectedDate, currentItemName, price);
+
+            // Move to next item or next shop
+            if (nextItemIndex + 1 < itemsList.length) {
+              nextItemIndex += 1;
+              const nextItem = itemsList[nextItemIndex];
+              nextUtterance = language === "mr"
+                ? `${currentItemName} चा दर ₹${price} सेट केला आहे. आता ${currentShopName} च्या ${nextItem} चा दर काय आहे?`
+                : `Set ${currentItemName} to ₹${price}. What is the price for ${nextItem} at ${currentShopName}?`;
+            } else if (nextShopIndex + 1 < shopsList.length) {
+              nextShopIndex += 1;
+              nextItemIndex = 0;
+              const nextShop = shopsList[nextShopIndex];
+              const nextItem = unpriced[nextShop][0];
+              nextUtterance = language === "mr"
+                ? `${currentItemName} चा दर ₹${price} सेट केला आहे. आता ${nextShop} दुकानासाठी, ${nextItem} चा दर काय आहे?`
+                : `Set ${currentItemName} to ₹${price}. Now for ${nextShop}, what is the price for ${nextItem}?`;
+            } else {
+              // All priced and locked! Prompt to generate bill
+              nextUtterance = language === "mr"
+                ? `सर्व दुकानांचे दर नोंदवले आहेत आणि बिले लॉक झाली आहेत. मी बिल पाठवू का? 'होय' किंवा 'नाही' म्हणा.`
+                : "All shops are priced and locked. Should I prepare the invoice to send? Say 'yes' or 'no'.";
+              nextStepIndex = 1; // invoice prompt step
+            }
+          } else {
+            nextUtterance = language === "mr"
+              ? `दर समजला नाही. कृपया दर पुन्हा सांगा.`
+              : "I didn't catch the price. Please repeat the unit rate.";
+          }
+        } else if (nextStepIndex === 1) {
+          // Step 1: billing invoice confirmation
+          if (query.includes("yes") || query.includes("हो") || query.includes("पाठव")) {
+            // Generate invoices for all shops that had deliveries today
+            db.getShops().forEach(s => {
+              const led = db.getLedger(s.name, selectedDate);
+              if (led && led.status === "locked") {
+                db.generateInvoice(s.name, selectedDate);
+              }
+            });
+            nextUtterance = language === "mr"
+              ? "बिले तयार करून पाठवली आहेत. धन्यवाद, शुभ रात्री!"
+              : "Invoices generated and shared. Thank you, good night!";
+          } else {
+            nextUtterance = language === "mr"
+              ? "ठीक आहे, बिले जतन केली आहेत. तुम्ही नंतर शेअर करू शकता. शुभ रात्री!"
+              : "Okay, bills are saved. You can share them manually later. Good night!";
+          }
+          isDone = true;
+        }
+      }
+    }
+    
+    // --- ON DEMAND CALL STATE MACHINE ---
+    else {
+      const result = await processVoiceInput(spokenText, role, language);
+      nextUtterance = result.responseText;
+      if (query.includes("bye") || query.includes("थांब") || query.includes("कॉल संपवा")) {
+        isDone = true;
+      }
+    }
+
+    setActiveCall(curr => {
+      if (curr) {
+        return {
+          ...curr,
+          aiUtterance: nextUtterance,
+          userSpeech: spokenText,
+          stepIndex: nextStepIndex,
+          shopIndex: nextShopIndex,
+          itemIndex: nextItemIndex,
+          tempPurchases: nextTempPurchases
+        };
+      }
+      return curr;
+    });
+
+    synthesizeSpeech(nextUtterance, language);
+
+    if (isDone) {
+      setTimeout(() => {
+        handleEndCall();
+      }, 5000);
+    }
+  };
+
+  // Simulated Time controller: Advances simulated clock and evaluates scheduled calls
+  const handleTimeWarp = (minutes: number) => {
+    let newMin = simulatedMinute + minutes;
+    let newHr = simulatedHour;
+
+    if (newMin >= 60) {
+      newHr += Math.floor(newMin / 60);
+      newMin = newMin % 60;
+    }
+    if (newHr >= 24) {
+      newHr = newHr % 24;
+    }
+
+    setSimulatedHour(newHr);
+    setSimulatedMinute(newMin);
+
+    // Update active retry timer if applicable
+    if (retryCallType && retryTimeRemaining !== null) {
+      const nextRemaining = Math.max(0, retryTimeRemaining - minutes);
+      setRetryTimeRemaining(nextRemaining);
+
+      if (nextRemaining === 0) {
+        setRetryCallType(null);
+        setRetryTimeRemaining(null);
+        initiateRinging(retryCallType);
+      }
+    }
+
+    // Scheduled trigger evaluations:
+    // 1. Morning call: 10:00 AM (Hour 10, Min 0)
+    const crossedMorning = (simulatedHour < 10 && newHr >= 10) || (simulatedHour === 10 && simulatedMinute < 0 && newMin >= 0);
+    if (crossedMorning && !retryCallType) {
+      initiateRinging("morning");
+    }
+
+    // 2. Night call: 9:00 PM (Hour 21, Min 0)
+    const crossedNight = (simulatedHour < 21 && newHr >= 21) || (simulatedHour === 21 && simulatedMinute < 0 && newMin >= 0);
+    if (crossedNight && !retryCallType) {
+      initiateRinging("night");
     }
   };
 
@@ -279,7 +721,6 @@ export default function App() {
     if (!editingEntry) return;
     const { shopId, date, itemId, itemName, quantity, unitPrice } = editingEntry;
     
-    // Find ledger
     const shop = shops.find(s => s.id === shopId);
     if (shop) {
       const ledger = db.getLedger(shop.name, date);
@@ -293,7 +734,6 @@ export default function App() {
           item.lineTotal = null;
         }
 
-        // Recalculate totals if locked
         if (ledger.status === 'locked') {
           const oldTotal = ledger.totalBill || 0;
           const newTotal = Object.values(ledger.items).reduce((sum, i) => sum + (i.lineTotal || 0), 0);
@@ -309,7 +749,6 @@ export default function App() {
     setEditingEntry(null);
   };
 
-  // Reset database helper
   const handleResetData = () => {
     if (confirm("Are you sure you want to clear all data? This will reset to default setup.")) {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -322,7 +761,7 @@ export default function App() {
 
   const t = TRANSLATIONS[language];
 
-  // Render Onboarding / Initial Setup Screen
+  // Onboarding Screen
   if (!hasOnboarded) {
     return (
       <View style={styles.onboardContainer}>
@@ -388,6 +827,43 @@ export default function App() {
       <View style={styles.content}>
         {currentTab === 'home' && (
           <ScrollView contentContainerStyle={styles.tabContent}>
+            {/* Simulated Scheduler & Time warp widget */}
+            <View style={styles.simulatedTimeWidget}>
+              <View style={styles.simTimeHeader}>
+                <Text style={styles.simTimeLabel}>🕰️ {t.simTimeLabel}</Text>
+                <Text style={styles.simTimeClock}>{getFormattedSimTime()}</Text>
+              </View>
+
+              {/* Time Warp Actions */}
+              <View style={styles.row}>
+                <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(15)}>
+                  <Text style={styles.warpBtnText}>{t.timeWarp15}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(30)}>
+                  <Text style={styles.warpBtnText}>{t.timeWarp30}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Instant Call Triggers */}
+              <View style={styles.row}>
+                <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("morning")}>
+                  <Text style={styles.triggerCallBtnText}>{t.triggerMorningCall}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("night")}>
+                  <Text style={styles.triggerCallBtnText}>{t.triggerNightCall}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Active Retry Banners */}
+              {retryCallType && retryTimeRemaining !== null && (
+                <View style={styles.retryBanner}>
+                  <Text style={styles.retryBannerText}>
+                    ⏳ {t.retryBanner} {retryTimeRemaining} {t.minutes} ({retryCallType === 'morning' ? t.morningCallTitle : t.nightCallTitle})
+                  </Text>
+                </View>
+              )}
+            </View>
+
             {/* Dynamic AI Status box */}
             <View style={styles.aiStatusBox}>
               <Text style={styles.voicePromptText}>
@@ -405,7 +881,7 @@ export default function App() {
               ) : null}
             </View>
 
-            {/* Mic and Call controls */}
+            {/* Controls */}
             <View style={styles.voiceControlsContainer}>
               <TouchableOpacity
                 style={[styles.micBigButton, isListening && styles.micListeningActive]}
@@ -415,6 +891,11 @@ export default function App() {
                 <Text style={styles.micButtonSubtext}>{t.quickNoteTitle}</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Large Call Mode Trigger */}
+            <TouchableOpacity style={styles.fullWidthCallBtn} onPress={() => initiateRinging("on_demand")}>
+              <Text style={styles.fullWidthCallBtnText}>{t.callBtn}</Text>
+            </TouchableOpacity>
 
             {/* Fallback Keyboard Input for Testing/Conversations */}
             <View style={styles.keyboardInputRow}>
@@ -620,6 +1101,97 @@ export default function App() {
         )}
       </View>
 
+      {/* --- Phase 4: Call Mode Ringing & Active Screen Modal Overlay --- */}
+      {activeCall && (
+        <Modal visible={true} animationType="fade" transparent={false}>
+          {activeCall.status === "ringing" && (
+            <View style={styles.ringingOverlay}>
+              <View style={styles.ringingCard}>
+                <Text style={styles.ringingStatusLabel}>📞 {t.incomingCall}</Text>
+                <Text style={styles.ringingCallerName}>{activeCall.callerName}</Text>
+                <View style={styles.ringingPulsar}></View>
+                
+                <View style={styles.ringingActions}>
+                  <TouchableOpacity style={styles.acceptCallBtn} onPress={handleAcceptCall}>
+                    <Text style={styles.callActionText}>{t.acceptBtn}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.declineCallBtn} onPress={handleDeclineCall}>
+                    <Text style={styles.callActionText}>{t.declineBtn}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {activeCall.status === "active" && (
+            <View style={styles.activeCallOverlay}>
+              <Text style={styles.activeCallTitle}>{activeCall.callerName}</Text>
+              
+              <Text style={styles.activeCallTimer}>
+                ⏱️ {Math.floor(activeCall.duration / 60).toString().padStart(2, '0')}:
+                {(activeCall.duration % 60).toString().padStart(2, '0')}
+              </Text>
+
+              {/* Voice waveform animation placeholder */}
+              <View style={styles.waveformContainer}>
+                <View style={[styles.waveBar, {height: 40 + Math.sin(activeCall.duration) * 15}]}></View>
+                <View style={[styles.waveBar, {height: 60 + Math.cos(activeCall.duration) * 20}]}></View>
+                <View style={[styles.waveBar, {height: 80 + Math.sin(activeCall.duration * 2) * 25}]}></View>
+                <View style={[styles.waveBar, {height: 50 + Math.cos(activeCall.duration * 1.5) * 15}]}></View>
+              </View>
+
+              {/* AI Speech Utterance Box */}
+              <View style={styles.callUtteranceBox}>
+                <Text style={styles.callUtteranceText}>🔊 {activeCall.aiUtterance}</Text>
+              </View>
+
+              {/* User Speech input for typing/submitting in emulator */}
+              <View style={styles.callInputRow}>
+                <TextInput
+                  style={styles.callTextInput}
+                  value={textCommand}
+                  onChangeText={setTextCommand}
+                  placeholder={language === 'mr' ? "इथे बोला..." : "Speak/type here..."}
+                  onSubmitEditing={() => {
+                    handleCallVoiceInput(textCommand);
+                    setTextCommand('');
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.callSendBtn}
+                  onPress={() => {
+                    handleCallVoiceInput(textCommand);
+                    setTextCommand('');
+                  }}
+                >
+                  <Text style={styles.callSendBtnText}>➡️</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick response helpers for testing call flows */}
+              <View style={styles.quickCallAnswersRow}>
+                <TouchableOpacity style={styles.quickAnswerBtn} onPress={() => handleCallVoiceInput("done")}>
+                  <Text style={styles.quickAnswerBtnText}>{t.callDoneBtn}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAnswerBtn} onPress={() => handleCallVoiceInput("yes")}>
+                  <Text style={styles.quickAnswerBtnText}>{t.callYesBtn}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.hangupBtn} onPress={handleEndCall}>
+                <Text style={styles.hangupBtnText}>{t.endCallBtn}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {activeCall.status === "missed" && (
+            <View style={styles.missedCallOverlay}>
+              <Text style={styles.missedCallText}>🔴 {t.missedCallAlert}</Text>
+            </View>
+          )}
+        </Modal>
+      )}
+
       {/* Manual edit modal */}
       <Modal visible={editModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
@@ -720,7 +1292,7 @@ const styles = StyleSheet.create({
   onboardCard: {
     width: '90%',
     maxWidth: 450,
-    backgroundColor: '#fff',
+    backgroundColor: '#white',
     borderRadius: 24,
     padding: 24,
     shadowColor: '#000',
@@ -745,6 +1317,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginVertical: 4,
   },
   toggleBtn: {
     flex: 1,
@@ -827,6 +1400,69 @@ const styles = StyleSheet.create({
   tabContent: {
     padding: 20,
   },
+  simulatedTimeWidget: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e8eaf6',
+  },
+  simTimeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  simTimeLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  simTimeClock: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a237e',
+  },
+  warpBtn: {
+    flex: 1,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  warpBtnText: {
+    color: '#1565c0',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  triggerCallBtn: {
+    flex: 1,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginHorizontal: 4,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  triggerCallBtnText: {
+    color: '#2e7d32',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  retryBanner: {
+    backgroundColor: '#fff3e0',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  retryBannerText: {
+    color: '#e65100',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   aiStatusBox: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -866,12 +1502,12 @@ const styles = StyleSheet.create({
   voiceControlsContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 15,
   },
   micBigButton: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: '#1a237e',
     justifyContent: 'center',
     alignItems: 'center',
@@ -885,12 +1521,28 @@ const styles = StyleSheet.create({
     shadowColor: '#c62828',
   },
   micIconText: {
-    fontSize: 50,
+    fontSize: 40,
   },
   micButtonSubtext: {
     color: '#fff',
-    fontSize: 12,
-    marginTop: 8,
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: 'bold',
+  },
+  fullWidthCallBtn: {
+    backgroundColor: '#2e7d32',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#2e7d32',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  fullWidthCallBtnText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   keyboardInputRow: {
@@ -1212,5 +1864,179 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#757575',
     fontWeight: 'bold',
+  },
+
+  // Call overlay styles
+  ringingOverlay: {
+    flex: 1,
+    backgroundColor: '#0d1b2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringingCard: {
+    width: '85%',
+    maxWidth: 350,
+    alignItems: 'center',
+  },
+  ringingStatusLabel: {
+    fontSize: 16,
+    color: '#a0c4ff',
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  ringingCallerName: {
+    fontSize: 26,
+    color: '#fff',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  ringingPulsar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#1b4332',
+    opacity: 0.6,
+    marginBottom: 60,
+  },
+  ringingActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+  },
+  acceptCallBtn: {
+    backgroundColor: '#2d6a4f',
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 30,
+  },
+  declineCallBtn: {
+    backgroundColor: '#b7094c',
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 30,
+  },
+  callActionText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  activeCallOverlay: {
+    flex: 1,
+    backgroundColor: '#111b27',
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 60,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  activeCallTitle: {
+    fontSize: 22,
+    color: '#fff',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  activeCallTimer: {
+    fontSize: 16,
+    color: '#72efdd',
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  waveformContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 100,
+  },
+  waveBar: {
+    width: 8,
+    backgroundColor: '#72efdd',
+    marginHorizontal: 4,
+    borderRadius: 4,
+  },
+  callUtteranceBox: {
+    backgroundColor: '#1d2d44',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+  },
+  callUtteranceText: {
+    color: '#fff',
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  callInputRow: {
+    flexDirection: 'row',
+    backgroundColor: '#1d2d44',
+    borderRadius: 12,
+    padding: 6,
+    alignItems: 'center',
+    width: '100%',
+  },
+  callTextInput: {
+    flex: 1,
+    color: '#fff',
+    paddingHorizontal: 12,
+    fontSize: 15,
+  },
+  callSendBtn: {
+    backgroundColor: '#72efdd',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  callSendBtnText: {
+    fontSize: 18,
+  },
+  quickCallAnswersRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    marginVertical: 10,
+  },
+  quickAnswerBtn: {
+    backgroundColor: '#3e5c76',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginHorizontal: 8,
+  },
+  quickAnswerBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  hangupBtn: {
+    backgroundColor: '#b7094c',
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    shadowColor: '#b7094c',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  hangupBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  missedCallOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  missedCallText: {
+    fontSize: 18,
+    color: '#ff4d4f',
+    fontWeight: 'bold',
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    textAlign: 'center',
   },
 });
