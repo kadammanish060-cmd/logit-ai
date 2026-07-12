@@ -85,7 +85,8 @@ const DEFAULT_SHOPS: Shop[] = [
 const DEFAULT_ITEMS: CanonicalItem[] = [
   { id: "onion", name: "onion", aliases: ["onion", "onions", "कांदा", "कांदे"] },
   { id: "potato", name: "potato", aliases: ["potato", "potatoes", "बटाटा", "बटाटे"] },
-  { id: "chilli_lemon", name: "chilli Lemon", aliases: ["chilli lemon", "chili lemon", "मिरची लिंबू", "मिरची लिंबु"] },
+  { id: "chilli", name: "chilli", aliases: ["chilli", "chili", "chillies", "मिरची", "मिरच्या"] },
+  { id: "lemon", name: "lemon", aliases: ["lemon", "lemons", "लिंबू", "लिंबु"] },
   { id: "ginger", name: "ginger", aliases: ["ginger", "आलं", "अद्रक"] },
   { id: "garlic", name: "garlic", aliases: ["garlic", "लसूण", "लसून"] },
   { id: "mint", name: "mint", aliases: ["mint", "पुदिना", "फुदिना"] },

@@ -953,7 +953,7 @@ export default function App() {
         </View>
         <View style={styles.headerBadgeContainer}>
           <Text style={styles.badgeText}>
-            {role === 'admin' ? "👑 Admin" : "👤 Driver"} | {language === 'en' ? "EN" : "मराठी"}
+            {role === 'admin' ? "👑 Admin" : (language === 'mr' ? "👤 नॉर्मल" : "👤 Normal")} | {language === 'en' ? "EN" : "मराठी"}
           </Text>
         </View>
       </View>
