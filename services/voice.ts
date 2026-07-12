@@ -1,4 +1,4 @@
-import { Audio as ExpoAudio } from 'expo-av';
+import { createAudioPlayer } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
@@ -119,19 +119,16 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
             encoding: FileSystem.EncodingType.Base64,
           });
 
-          const { sound } = await ExpoAudio.Sound.createAsync({ uri: tempUri });
-          return new Promise((resolve) => {
-            sound.setOnPlaybackStatusUpdate((status: any) => {
+          const player = createAudioPlayer(tempUri);
+          return new Promise<void>((resolve) => {
+            const subscription = player.addListener('playbackStatusUpdate', (status: any) => {
               if (status.didJustFinish) {
-                sound.unloadAsync().catch(() => {});
+                subscription.remove();
+                player.release();
                 resolve();
               }
             });
-            sound.playAsync().catch((err) => {
-              console.error("Native playAsync error:", err);
-              sound.unloadAsync().catch(() => {});
-              resolve();
-            });
+            player.play();
           });
         } catch (err) {
           console.error("Native audio playback error:", err);
