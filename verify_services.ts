@@ -2,6 +2,8 @@
 import * as db from "./services/db";
 import { processVoiceInput } from "./services/gemini";
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 async function runTests() {
   console.log("--- 1. Testing Database Initialization & Seed Data ---");
   db.loadDatabase();
@@ -25,22 +27,32 @@ async function runTests() {
   console.log("Payment:", payRes);
 
   console.log("\n--- 5. Testing Gemini NLP Voice Input (English) ---");
+  await delay(4000);
   const voiceRes1 = await processVoiceInput("Log delivery of 20 tomato to Joshi wadewale", "admin", "en");
   console.log("Query: 'Log delivery of 20 tomato to Joshi wadewale'");
   console.log("AI Response:", voiceRes1.responseText);
   console.log("Tool Executed:", voiceRes1.toolExecuted);
 
   console.log("\n--- 5b. Testing Gemini NLP Voice Input (Sudama 3 kgs of Kanda) ---");
+  await delay(4000);
   const voiceRes1b = await processVoiceInput("Sudama 3 kgs of Kanda", "admin", "en");
   console.log("Query: 'Sudama 3 kgs of Kanda'");
   console.log("AI Response:", voiceRes1b.responseText);
   console.log("Tool Executed:", voiceRes1b.toolExecuted);
 
   console.log("\n--- 6. Testing Gemini NLP Voice Input (Marathi) ---");
+  await delay(4000);
   const voiceRes2 = await processVoiceInput("सुदामाचे कडून ३०० रुपयांचे पेमेंट नोंदवा", "admin", "mr");
   console.log("Query: 'सुदामाचे कडून ३०० रुपयांचे पेमेंट नोंदवा'");
   console.log("AI Response:", voiceRes2.responseText);
   console.log("Tool Executed:", voiceRes2.toolExecuted);
+
+  console.log("\n--- 6b. Testing Gemini NLP Read Tool (How much does Sudamache owe us?) ---");
+  await delay(4000);
+  const voiceRes2b = await processVoiceInput("How much does Sudamache owe us?", "admin", "en");
+  console.log("Query: 'How much does Sudamache owe us?'");
+  console.log("AI Response:", voiceRes2b.responseText);
+  console.log("Tool Executed:", voiceRes2b.toolExecuted);
 
   console.log("\n--- 7. Verification Finished successfully! ---");
 }

@@ -382,21 +382,18 @@ export async function processVoiceInput(
 ): Promise<AIResponse> {
   const currentDate = new Date().toISOString().split("T")[0];
 
-  console.log(`[Gemini API] processVoiceInput called. Text: "${text}", Role: "${role}", Lang: "${lang}"`);
-  console.log(`[Gemini API] USE_REAL_GEMINI: ${USE_REAL_GEMINI}, API Key defined: ${!!apiKey}, API Key starts with: ${apiKey ? apiKey.substring(0, 5) : "empty"}...`);
+  console.log(`[Gemini API] processVoiceInput. USE_REAL_GEMINI: ${USE_REAL_GEMINI}`);
 
   if (!USE_REAL_GEMINI || !ai) {
-    console.log("[Gemini API] Executing MOCK fallback path.");
     // FALLBACK TO THE ORIGINAL MOCK CLASSIFIER
     return processVoiceInputMock(text, role, lang);
   }
-  console.log("[Gemini API] Executing REAL Gemini API path.");
 
   try {
     const systemPrompt = getSystemPrompt(role, lang, currentDate);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.0-flash',
       contents: text,
       config: {
         systemInstruction: systemPrompt,
@@ -476,10 +473,14 @@ export async function processVoiceInput(
         executionError = true;
       }
 
-      // Generate conversational summary response by supplying tool results back to Gemini
+      const modelContent = response.candidates?.[0]?.content || {
+        role: 'model',
+        parts: [{ functionCall: { name: toolName, args } }]
+      };
+
       const history: Content[] = [
         { role: 'user', parts: [{ text }] },
-        { role: 'model', parts: [{ functionCall: { name: toolName, args } }] },
+        modelContent,
         { 
           role: 'user', 
           parts: [{ 
@@ -492,7 +493,7 @@ export async function processVoiceInput(
       ];
 
       const followUp = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.0-flash',
         contents: history,
         config: {
           systemInstruction: systemPrompt
@@ -807,6 +808,41 @@ export async function processVoiceInputMock(
       toolExecuted: "logDelivery",
       toolResult: { shopName: matchedShop.name, itemName: matchedItem.name, quantity: qty, date: targetDate, role }
     };
+  }
+
+  // 8. GET OUTSTANDING BALANCE (READ TOOL)
+  // Keywords: how much, balance, owe, outstanding, बाकी, देणे, येणे, किती
+  if (query.includes("how much") || query.includes("balance") || query.includes("owe") || 
+      query.includes("outstanding") || query.includes("बाकी") || query.includes("देणे") || 
+      query.includes("येणे") || query.includes("किती")) {
+    const balances = db.getOutstandingBalance(matchedShop?.name);
+    let reply = "";
+    if (matchedShop) {
+      const bal = balances[matchedShop.name] ?? 0;
+      if (lang === "mr") {
+        reply = `${matchedShop.name} कडे आपले ₹${bal} बाकी आहेत.`;
+      } else {
+        reply = `${matchedShop.name} owes us ₹${bal}.`;
+      }
+      return {
+        responseText: reply,
+        toolExecuted: "getOutstandingBalance",
+        toolResult: balances
+      };
+    } else {
+      // List all balances
+      const entries = Object.entries(balances);
+      if (lang === "mr") {
+        reply = "सर्व दुकानांची थकबाकी: " + entries.map(([name, bal]) => `${name}: ₹${bal}`).join(", ");
+      } else {
+        reply = "Outstanding balances: " + entries.map(([name, bal]) => `${name}: ₹${bal}`).join(", ");
+      }
+      return {
+        responseText: reply,
+        toolExecuted: "getOutstandingBalance",
+        toolResult: balances
+      };
+    }
   }
 
   // Clarifying Prompt / Question
