@@ -30,6 +30,12 @@ async function runTests() {
   console.log("AI Response:", voiceRes1.responseText);
   console.log("Tool Executed:", voiceRes1.toolExecuted);
 
+  console.log("\n--- 5b. Testing Gemini NLP Voice Input (Sudama 3 kgs of Kanda) ---");
+  const voiceRes1b = await processVoiceInput("Sudama 3 kgs of Kanda", "admin", "en");
+  console.log("Query: 'Sudama 3 kgs of Kanda'");
+  console.log("AI Response:", voiceRes1b.responseText);
+  console.log("Tool Executed:", voiceRes1b.toolExecuted);
+
   console.log("\n--- 6. Testing Gemini NLP Voice Input (Marathi) ---");
   const voiceRes2 = await processVoiceInput("सुदामाचे कडून ३०० रुपयांचे पेमेंट नोंदवा", "admin", "mr");
   console.log("Query: 'सुदामाचे कडून ३०० रुपयांचे पेमेंट नोंदवा'");

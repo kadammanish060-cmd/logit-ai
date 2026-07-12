@@ -192,6 +192,9 @@ const GEMINI_TOOLS = [
 ];
 
 function getSystemPrompt(role: "admin" | "normal", lang: "en" | "mr", date: string): string {
+  const shops = db.getShops();
+  const items = db.getItems();
+
   const roleInstruction = role === "admin" 
     ? "You are logged in as an Admin. You have full write permissions to log deliveries, set prices, and approve/reject pending logs. When a payment or delivery is logged, it will be immediately confirmed." 
     : "You are logged in as a Normal user (Father/driver). Every delivery or payment you log will enter as 'pending_approval' until an Admin approves it. Always inform the user that their entry has been submitted for review.";
@@ -205,14 +208,24 @@ Current Date: ${date}
 ${roleInstruction}
 ${langInstruction}
 
+You must normalize shop names and item names exactly. Here is the canonical mapping database:
+
+### Canonical Shops list:
+${shops.map(s => `- ID: ${s.id}, Name: "${s.name}", commonly spoken as: ${s.name}, Sudama, Joshi, Rahatani`).join("\n")}
+
+### Canonical Items list (with spoken aliases):
+${items.map(i => `- Name: "${i.name}", aliases/spoken names: ${i.aliases.join(", ")}`).join("\n")}
+
 Rules:
-1. Parse the user's intent from their voice query (which may be in English, Marathi, or a mix).
+1. Parse the user's intent from their voice query (which may be in English, Marathi, or a mix of both).
 2. If they are logging a delivery, a purchase, setting a price, logging a payment, locking a ledger, generating an invoice, or approving/rejecting a request, call the matching function tool with the normalized parameters.
-3. Normalize shop names to one of: "Sudamache", "Joshi wadewale", "Rahatani Sudamache". If a shop name is spoken in Marathi (e.g. 'जोशी', 'सुदामा'), map it to its canonical name.
-4. Normalize item names to one of: "onion", "potato", "chilli", "lemon", "ginger", "garlic", "mint", "coriander", "tomato", "cucumber". If an item name is spoken in Marathi (e.g. 'कांदा', 'बटाटा', 'लिंबू', 'मिरची'), map it to its canonical name.
-5. If required parameters are missing (e.g., shop name, item, quantity, price), do not call any tool; instead, respond with a friendly message/question in the selected language asking the user for the missing details.
-6. Once a tool has been successfully executed, formulate a warm, natural reply summarizing the action in the selected language (English or Marathi).
-7. Do not hallucinate or output raw JSON. Always respond conversationally.`;
+3. Normalize shopName to one of the exact canonical shop names: "Sudamache", "Joshi wadewale", "Rahatani Sudamache".
+4. Normalize itemName to one of the exact canonical item names: "onion", "potato", "chilli", "lemon", "ginger", "garlic", "mint", "coriander", "tomato", "cucumber".
+5. If the user refers to an item by any of its spoken aliases or translation (e.g. 'Kanda', 'कांदा', 'कांदे', 'onion'), you MUST map it to the canonical name (e.g. "onion").
+6. If the user refers to a shop by a shortened name or translation (e.g. 'Sudama', 'जोशी', 'सुदामा'), map it to the canonical name (e.g. "Sudamache", "Joshi wadewale").
+7. If required parameters are missing (e.g., shop name, item, quantity, price), do not call any tool; instead, respond with a friendly message/question in the selected language asking the user for the missing details.
+8. Once a tool has been successfully executed, formulate a warm, natural reply summarizing the action in the selected language (English or Marathi).
+9. Do not hallucinate or output raw JSON. Always respond conversationally.`;
 }
 
 export interface AIResponse {
@@ -289,10 +302,15 @@ export async function processVoiceInput(
 ): Promise<AIResponse> {
   const currentDate = new Date().toISOString().split("T")[0];
 
+  console.log(`[Gemini API] processVoiceInput called. Text: "${text}", Role: "${role}", Lang: "${lang}"`);
+  console.log(`[Gemini API] USE_REAL_GEMINI: ${USE_REAL_GEMINI}, API Key defined: ${!!apiKey}, API Key starts with: ${apiKey ? apiKey.substring(0, 5) : "empty"}...`);
+
   if (!USE_REAL_GEMINI || !ai) {
+    console.log("[Gemini API] Executing MOCK fallback path.");
     // FALLBACK TO THE ORIGINAL MOCK CLASSIFIER
     return processVoiceInputMock(text, role, lang);
   }
+  console.log("[Gemini API] Executing REAL Gemini API path.");
 
   try {
     const systemPrompt = getSystemPrompt(role, lang, currentDate);
@@ -422,18 +440,38 @@ export async function processVoiceInputMock(
     return match ? parseInt(match[0], 10) : null;
   };
 
+  const isWordInText = (word: string, text: string): boolean => {
+    const lowerWord = word.toLowerCase();
+    const lowerText = text.toLowerCase();
+    
+    let index = lowerText.indexOf(lowerWord);
+    while (index !== -1) {
+      const charBefore = index > 0 ? lowerText[index - 1] : " ";
+      const charAfter = index + lowerWord.length < lowerText.length ? lowerText[index + lowerWord.length] : " ";
+      
+      const isBoundBefore = !/[a-zA-Z0-9]/.test(charBefore);
+      const isBoundAfter = !/[a-zA-Z0-9]/.test(charAfter);
+      
+      if (isBoundBefore && isBoundAfter) {
+        return true;
+      }
+      index = lowerText.indexOf(lowerWord, index + 1);
+    }
+    return false;
+  };
+
   // Find shop names in text
   const shops = db.getShops();
-  let matchedShop = shops.find((s) => query.includes(s.name.toLowerCase()));
+  let matchedShop = shops.find((s) => isWordInText(s.name, query));
   
   // Marathi specific shop matching (case support)
-  if (!matchedShop && lang === "mr") {
+  if (!matchedShop) {
     // Check if shop name is inflected, e.g. "सुदामाचे" for "Sudamache"
-    if (query.includes("सुदामा") || query.includes("sudama")) {
+    if (isWordInText("सुदामा", query) || isWordInText("sudama", query)) {
       matchedShop = shops.find(s => s.id === "shop_1");
-    } else if (query.includes("जोशी") || query.includes("joshi")) {
+    } else if (isWordInText("जोशी", query) || isWordInText("joshi", query)) {
       matchedShop = shops.find(s => s.id === "shop_2");
-    } else if (query.includes("राहाटणी") || query.includes("rahatani")) {
+    } else if (isWordInText("राहाटणी", query) || isWordInText("rahatani", query)) {
       matchedShop = shops.find(s => s.id === "shop_3");
     }
   }
@@ -441,8 +479,8 @@ export async function processVoiceInputMock(
   // Find canonical items in text
   const items = db.getItems();
   let matchedItem = items.find((i) => {
-    return query.includes(i.name.toLowerCase()) || 
-           i.aliases.some((alias) => query.includes(alias.toLowerCase()));
+    return isWordInText(i.name, query) || 
+           i.aliases.some((alias) => isWordInText(alias, query));
   });
 
   // Extract amount/quantity
