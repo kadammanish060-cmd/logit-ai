@@ -1,3 +1,7 @@
+import { Audio as ExpoAudio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
+
 const apiKey = process.env.EXPO_PUBLIC_SARVAM_API_KEY || process.env.SARVAM_API_KEY;
 const USE_REAL_SARVAM = apiKey && apiKey !== "YOUR_SARVAM_KEY";
 
@@ -93,17 +97,45 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
 
     if (data.audios && data.audios.length > 0) {
       const base64Audio = data.audios[0];
-      if (typeof window !== "undefined") {
-        const audioSrc = `data:audio/wav;base64,${base64Audio}`;
-        const audio = new Audio(audioSrc);
-        return new Promise((resolve) => {
-          audio.onended = () => resolve();
-          audio.onerror = () => resolve();
-          audio.play().catch((err) => {
-            console.error("Audio playback error:", err);
-            resolve();
+      if (Platform.OS === 'web') {
+        if (typeof Audio !== "undefined") {
+          const audioSrc = `data:audio/wav;base64,${base64Audio}`;
+          const audio = new Audio(audioSrc);
+          return new Promise((resolve) => {
+            audio.onended = () => resolve();
+            audio.onerror = () => resolve();
+            audio.play().catch((err) => {
+              console.error("Audio playback error:", err);
+              resolve();
+            });
           });
-        });
+        }
+      } else {
+        // Native mobile build (Android / iOS)
+        try {
+          const tempUri = `${FileSystem.cacheDirectory}temp_tts.wav`;
+          const base64Data = base64Audio.replace(/^data:audio\/\w+;base64,/, "");
+          await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          const { sound } = await ExpoAudio.Sound.createAsync({ uri: tempUri });
+          return new Promise((resolve) => {
+            sound.setOnPlaybackStatusUpdate((status: any) => {
+              if (status.didJustFinish) {
+                sound.unloadAsync().catch(() => {});
+                resolve();
+              }
+            });
+            sound.playAsync().catch((err) => {
+              console.error("Native playAsync error:", err);
+              sound.unloadAsync().catch(() => {});
+              resolve();
+            });
+          });
+        } catch (err) {
+          console.error("Native audio playback error:", err);
+        }
       }
     }
   } catch (error: any) {
@@ -158,7 +190,9 @@ export function startContinuousListening(
     }
   }
 
-  console.warn("SpeechRecognition not supported in this environment");
+  if (Platform.OS === 'web') {
+    console.warn("SpeechRecognition not supported in this environment");
+  }
   return { stop: () => {} };
 }
 
