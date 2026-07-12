@@ -1,5 +1,219 @@
-// Mock Gemini reasoning layer with tool function-calling support
+// Real Gemini reasoning layer with tool function-calling support & mock fallback
+import { GoogleGenAI, Type, Content } from '@google/genai';
 import * as db from "./db";
+
+const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+const USE_REAL_GEMINI = true && apiKey !== "" && apiKey !== "YOUR_API_KEY";
+
+const ai = USE_REAL_GEMINI ? new GoogleGenAI({ apiKey }) : null;
+
+// Tool declarations
+const LOG_DELIVERY_TOOL = {
+  name: "logDelivery",
+  description: "Log a delivery of goods/vegetables to a shop.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { 
+        type: Type.STRING, 
+        description: "Name of the shop. Should be normalized to one of: 'Sudamache', 'Joshi wadewale', 'Rahatani Sudamache'." 
+      },
+      itemName: { 
+        type: Type.STRING, 
+        description: "Name of the vegetable/item. Should be normalized to one of: 'onion', 'potato', 'chilli', 'lemon', 'ginger', 'garlic', 'mint', 'coriander', 'tomato', 'cucumber'." 
+      },
+      quantity: { 
+        type: Type.NUMBER, 
+        description: "Quantity of the item delivered (positive number, e.g. 20)." 
+      },
+      date: { 
+        type: Type.STRING, 
+        description: "Date of delivery in YYYY-MM-DD format. Defaults to current date if not specified." 
+      }
+    },
+    required: ["shopName", "itemName", "quantity"]
+  }
+};
+
+const LOG_PURCHASE_TOOL = {
+  name: "logPurchase",
+  description: "Log a purchase of items/vegetables bought from the market (Mandai).",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      itemName: { 
+        type: Type.STRING, 
+        description: "Name of the item/vegetable. Should be normalized to one of: 'onion', 'potato', 'chilli', 'lemon', 'ginger', 'garlic', 'mint', 'coriander', 'tomato', 'cucumber'." 
+      },
+      quantity: { 
+        type: Type.NUMBER, 
+        description: "Quantity purchased." 
+      },
+      pricePaid: { 
+        type: Type.NUMBER, 
+        description: "Total price paid in rupees (e.g. 200)." 
+      },
+      date: { 
+        type: Type.STRING, 
+        description: "Date of purchase in YYYY-MM-DD format. Defaults to current date if not specified." 
+      }
+    },
+    required: ["itemName", "quantity", "pricePaid"]
+  }
+};
+
+const SET_PRICE_TOOL = {
+  name: "setPrice",
+  description: "Set the unit price (rate) for a delivered item at a shop.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { 
+        type: Type.STRING, 
+        description: "Name of the shop (e.g. 'Sudamache')." 
+      },
+      itemName: { 
+        type: Type.STRING, 
+        description: "Name of the item (e.g. 'onion')." 
+      },
+      unitPrice: { 
+        type: Type.NUMBER, 
+        description: "Price per unit/rate in rupees (e.g. 15)." 
+      },
+      date: { 
+        type: Type.STRING, 
+        description: "Date of the ledger (YYYY-MM-DD)." 
+      }
+    },
+    required: ["shopName", "itemName", "unitPrice"]
+  }
+};
+
+const LOG_PAYMENT_TOOL = {
+  name: "logPayment",
+  description: "Log a payment received from a shop.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { 
+        type: Type.STRING, 
+        description: "Name of the shop." 
+      },
+      amount: { 
+        type: Type.NUMBER, 
+        description: "Payment amount received in rupees." 
+      }
+    },
+    required: ["shopName", "amount"]
+  }
+};
+
+const LOCK_LEDGER_TOOL = {
+  name: "lockLedger",
+  description: "Lock and finalize the ledger sheet for a shop on a specific date.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { 
+        type: Type.STRING, 
+        description: "Name of the shop." 
+      },
+      date: { 
+        type: Type.STRING, 
+        description: "Date of the ledger (YYYY-MM-DD)." 
+      }
+    },
+    required: ["shopName"]
+  }
+};
+
+const GENERATE_INVOICE_TOOL = {
+  name: "generateInvoice",
+  description: "Generate and share the invoice/bill for a shop on a specific date.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { 
+        type: Type.STRING, 
+        description: "Name of the shop." 
+      },
+      date: { 
+        type: Type.STRING, 
+        description: "Date of the ledger (YYYY-MM-DD)." 
+      }
+    },
+    required: ["shopName"]
+  }
+};
+
+const APPROVE_ENTRY_TOOL = {
+  name: "approveEntry",
+  description: "Approve a pending delivery or payment log by its request ID (Admin only).",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      approvalId: { 
+        type: Type.STRING, 
+        description: "Approval request ID (e.g. 'approval_123')." 
+      }
+    },
+    required: ["approvalId"]
+  }
+};
+
+const REJECT_ENTRY_TOOL = {
+  name: "rejectEntry",
+  description: "Reject a pending delivery or payment log by its request ID (Admin only).",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      approvalId: { 
+        type: Type.STRING, 
+        description: "Approval request ID (e.g. 'approval_123')." 
+      }
+    },
+    required: ["approvalId"]
+  }
+};
+
+const GEMINI_TOOLS = [
+  {
+    functionDeclarations: [
+      LOG_DELIVERY_TOOL,
+      LOG_PURCHASE_TOOL,
+      SET_PRICE_TOOL,
+      LOG_PAYMENT_TOOL,
+      LOCK_LEDGER_TOOL,
+      GENERATE_INVOICE_TOOL,
+      APPROVE_ENTRY_TOOL,
+      REJECT_ENTRY_TOOL
+    ]
+  }
+];
+
+function getSystemPrompt(role: "admin" | "normal", lang: "en" | "mr", date: string): string {
+  const roleInstruction = role === "admin" 
+    ? "You are logged in as an Admin. You have full write permissions to log deliveries, set prices, and approve/reject pending logs. When a payment or delivery is logged, it will be immediately confirmed." 
+    : "You are logged in as a Normal user (Father/driver). Every delivery or payment you log will enter as 'pending_approval' until an Admin approves it. Always inform the user that their entry has been submitted for review.";
+
+  const langInstruction = lang === "mr"
+    ? "Always respond in warm, conversational Marathi (Devanagari script). Translating English words like item names to their Devanagari equivalents or using colloquial Devanagari is fine. For numbers, use standard English digits (e.g., 20, 300) in your response text to ensure clear readability."
+    : "Always respond in warm, conversational English.";
+
+  return `You are a helpful bilingual (English/Marathi) voice bookkeeping assistant for the Logit AI application.
+Current Date: ${date}
+${roleInstruction}
+${langInstruction}
+
+Rules:
+1. Parse the user's intent from their voice query (which may be in English, Marathi, or a mix).
+2. If they are logging a delivery, a purchase, setting a price, logging a payment, locking a ledger, generating an invoice, or approving/rejecting a request, call the matching function tool with the normalized parameters.
+3. Normalize shop names to one of: "Sudamache", "Joshi wadewale", "Rahatani Sudamache". If a shop name is spoken in Marathi (e.g. 'जोशी', 'सुदामा'), map it to its canonical name.
+4. Normalize item names to one of: "onion", "potato", "chilli", "lemon", "ginger", "garlic", "mint", "coriander", "tomato", "cucumber". If an item name is spoken in Marathi (e.g. 'कांदा', 'बटाटा', 'लिंबू', 'मिरची'), map it to its canonical name.
+5. If required parameters are missing (e.g., shop name, item, quantity, price), do not call any tool; instead, respond with a friendly message/question in the selected language asking the user for the missing details.
+6. Once a tool has been successfully executed, formulate a warm, natural reply summarizing the action in the selected language (English or Marathi).
+7. Do not hallucinate or output raw JSON. Always respond conversationally.`;
+}
 
 export interface AIResponse {
   responseText: string;
@@ -69,6 +283,133 @@ function convertMarathiNumerals(str: string): string {
 
 // Main AI Natural Language Query Parser
 export async function processVoiceInput(
+  text: string,
+  role: "admin" | "normal" = "admin",
+  lang: "en" | "mr" = "en"
+): Promise<AIResponse> {
+  const currentDate = new Date().toISOString().split("T")[0];
+
+  if (!USE_REAL_GEMINI || !ai) {
+    // FALLBACK TO THE ORIGINAL MOCK CLASSIFIER
+    return processVoiceInputMock(text, role, lang);
+  }
+
+  try {
+    const systemPrompt = getSystemPrompt(role, lang, currentDate);
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: text,
+      config: {
+        systemInstruction: systemPrompt,
+        tools: GEMINI_TOOLS
+      }
+    });
+
+    const calls = response.functionCalls;
+    if (calls && calls.length > 0) {
+      const call = calls[0];
+      const toolName = call.name;
+      const args = call.args as any;
+
+      let resultStr = "";
+      let executionError = false;
+
+      try {
+        if (toolName === "logDelivery") {
+          resultStr = db.logDelivery(
+            args.shopName,
+            args.itemName,
+            args.quantity,
+            args.date || currentDate,
+            role
+          );
+        } else if (toolName === "logPurchase") {
+          resultStr = db.logPurchase(
+            args.date || currentDate,
+            args.itemName,
+            args.quantity,
+            args.pricePaid
+          );
+        } else if (toolName === "setPrice") {
+          resultStr = db.setPrice(
+            args.shopName,
+            args.date || currentDate,
+            args.itemName,
+            args.unitPrice
+          );
+        } else if (toolName === "logPayment") {
+          resultStr = db.logPayment(
+            args.shopName,
+            args.amount,
+            role
+          );
+        } else if (toolName === "lockLedger") {
+          resultStr = db.lockLedger(
+            args.shopName,
+            args.date || currentDate
+          );
+        } else if (toolName === "generateInvoice") {
+          resultStr = db.generateInvoice(
+            args.shopName,
+            args.date || currentDate
+          );
+        } else if (toolName === "approveEntry") {
+          resultStr = db.approveEntry(args.approvalId);
+        } else if (toolName === "rejectEntry") {
+          resultStr = db.rejectEntry(args.approvalId);
+        } else {
+          throw new Error(`Unknown tool name: ${toolName}`);
+        }
+      } catch (err: any) {
+        resultStr = `Error: ${err.message}`;
+        executionError = true;
+      }
+
+      // Generate conversational summary response by supplying tool results back to Gemini
+      const history: Content[] = [
+        { role: 'user', parts: [{ text }] },
+        { role: 'model', parts: [{ functionCall: { name: toolName, args } }] },
+        { 
+          role: 'user', 
+          parts: [{ 
+            functionResponse: {
+              name: toolName,
+              response: { result: resultStr }
+            }
+          }] 
+        }
+      ];
+
+      const followUp = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: history,
+        config: {
+          systemInstruction: systemPrompt
+        }
+      });
+
+      return {
+        responseText: followUp.text || "",
+        toolExecuted: toolName || null,
+        toolResult: { ...args, executionResult: resultStr }
+      };
+    } else {
+      // Direct text response
+      return {
+        responseText: response.text || "",
+        toolExecuted: null,
+        toolResult: null
+      };
+    }
+  } catch (error: any) {
+    console.error("Gemini API call failed, falling back to mock:", error);
+    return processVoiceInputMock(text, role, lang);
+  }
+}
+
+// Fallback Mock Classifier
+export async function processVoiceInputMock(
   text: string,
   role: "admin" | "normal" = "admin",
   lang: "en" | "mr" = "en"
