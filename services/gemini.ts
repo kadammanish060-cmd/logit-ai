@@ -393,6 +393,8 @@ export async function processVoiceInput(
     const systemPrompt = getSystemPrompt(role, lang, currentDate);
 
     const response = await ai.models.generateContent({
+      // TECHNICAL DEBT: gemini-2.5-flash is temporarily unavailable for new API keys with the v2 SDK.
+      // Falling back to gemini-2.0-flash until upstream API key access is resolved.
       model: 'gemini-2.0-flash',
       contents: text,
       config: {
@@ -493,6 +495,8 @@ export async function processVoiceInput(
       ];
 
       const followUp = await ai.models.generateContent({
+        // TECHNICAL DEBT: gemini-2.5-flash is temporarily unavailable for new API keys with the v2 SDK.
+        // Falling back to gemini-2.0-flash until upstream API key access is resolved.
         model: 'gemini-2.0-flash',
         contents: history,
         config: {
