@@ -54,6 +54,27 @@ async function runTests() {
   console.log("AI Response:", voiceRes2b.responseText);
   console.log("Tool Executed:", voiceRes2b.toolExecuted);
 
+  console.log("\n--- 6c. Testing Gemini NLP Compound Command (Multi-shop English) ---");
+  await delay(4000);
+  const voiceRes3a = await processVoiceInput("delivered 10kg onion to Sudamache and 5kg tomato to Joshi wadewale", "admin", "en");
+  console.log("Query: 'delivered 10kg onion to Sudamache and 5kg tomato to Joshi wadewale'");
+  console.log("AI Response:", voiceRes3a.responseText);
+  console.log("Tool Executed:", voiceRes3a.toolExecuted);
+
+  console.log("\n--- 6d. Testing Gemini NLP Compound Command (Marathi Script) ---");
+  await delay(4000);
+  const voiceRes3b = await processVoiceInput("सुदामाचे ला २० किलो बटाटा आणि जोशी ला ३० किलो कांदा दिला", "admin", "mr");
+  console.log("Query: 'सुदामाचे ला २० किलो बटाटा आणि जोशी ला ३० किलो कांदा दिला'");
+  console.log("AI Response:", voiceRes3b.responseText);
+  console.log("Tool Executed:", voiceRes3b.toolExecuted);
+
+  console.log("\n--- 6e. Testing Gemini NLP Ambiguous Input (Clarification Request) ---");
+  await delay(4000);
+  const voiceRes3c = await processVoiceInput("delivered some onions to Sudamache", "admin", "en");
+  console.log("Query: 'delivered some onions to Sudamache'");
+  console.log("AI Response:", voiceRes3c.responseText);
+  console.log("Tool Executed:", voiceRes3c.toolExecuted);
+
   console.log("\n--- 7. Verification Finished successfully! ---");
 }
 

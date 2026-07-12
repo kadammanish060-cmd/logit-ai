@@ -405,79 +405,90 @@ export async function processVoiceInput(
     console.log("[Gemini API] PATH: REAL API success (first pass)");
     const calls = response.functionCalls;
     if (calls && calls.length > 0) {
-      const call = calls[0];
-      const toolName = call.name;
-      const args = call.args as any;
+      const toolResponses = [];
+      const executedTools = [];
+      const toolResults = [];
 
-      let resultStr = "";
-      let executionError = false;
+      for (const call of calls) {
+        const toolName = call.name;
+        const args = call.args as any;
+        let resultStr = "";
 
-      try {
-        if (toolName === "logDelivery") {
-          resultStr = db.logDelivery(
-            args.shopName,
-            args.itemName,
-            args.quantity,
-            args.date || currentDate,
-            role
-          );
-        } else if (toolName === "logPurchase") {
-          resultStr = db.logPurchase(
-            args.date || currentDate,
-            args.itemName,
-            args.quantity,
-            args.pricePaid
-          );
-        } else if (toolName === "setPrice") {
-          resultStr = db.setPrice(
-            args.shopName,
-            args.date || currentDate,
-            args.itemName,
-            args.unitPrice
-          );
-        } else if (toolName === "logPayment") {
-          resultStr = db.logPayment(
-            args.shopName,
-            args.amount,
-            role
-          );
-        } else if (toolName === "lockLedger") {
-          resultStr = db.lockLedger(
-            args.shopName,
-            args.date || currentDate
-          );
-        } else if (toolName === "generateInvoice") {
-          resultStr = db.generateInvoice(
-            args.shopName,
-            args.date || currentDate
-          );
-        } else if (toolName === "approveEntry") {
-          resultStr = db.approveEntry(args.approvalId);
-        } else if (toolName === "rejectEntry") {
-          resultStr = db.rejectEntry(args.approvalId);
-        } else if (toolName === "getLedger") {
-          resultStr = JSON.stringify(db.getLedger(args.shopName, args.date));
-        } else if (toolName === "getDeliveries") {
-          resultStr = JSON.stringify(db.getDeliveries(args.shopName, args.startDate, args.endDate, args.itemName));
-        } else if (toolName === "getOutstandingBalance") {
-          resultStr = JSON.stringify(db.getOutstandingBalance(args.shopName));
-        } else if (toolName === "getUnpricedItems") {
-          resultStr = JSON.stringify(db.getUnpricedItems(args.date));
-        } else if (toolName === "getPurchaseHistory") {
-          resultStr = JSON.stringify(db.getPurchaseHistory(args.startDate, args.endDate, args.itemName));
-        } else if (toolName === "getPendingApprovals") {
-          resultStr = JSON.stringify(db.getPendingApprovals());
-        } else {
-          throw new Error(`Unknown tool name: ${toolName}`);
+        try {
+          if (toolName === "logDelivery") {
+            resultStr = db.logDelivery(
+              args.shopName,
+              args.itemName,
+              args.quantity,
+              args.date || currentDate,
+              role
+            );
+          } else if (toolName === "logPurchase") {
+            resultStr = db.logPurchase(
+              args.date || currentDate,
+              args.itemName,
+              args.quantity,
+              args.pricePaid
+            );
+          } else if (toolName === "setPrice") {
+            resultStr = db.setPrice(
+              args.shopName,
+              args.date || currentDate,
+              args.itemName,
+              args.unitPrice
+            );
+          } else if (toolName === "logPayment") {
+            resultStr = db.logPayment(
+              args.shopName,
+              args.amount,
+              role
+            );
+          } else if (toolName === "lockLedger") {
+            resultStr = db.lockLedger(
+              args.shopName,
+              args.date || currentDate
+            );
+          } else if (toolName === "generateInvoice") {
+            resultStr = db.generateInvoice(
+              args.shopName,
+              args.date || currentDate
+            );
+          } else if (toolName === "approveEntry") {
+            resultStr = db.approveEntry(args.approvalId);
+          } else if (toolName === "rejectEntry") {
+            resultStr = db.rejectEntry(args.approvalId);
+          } else if (toolName === "getLedger") {
+            resultStr = JSON.stringify(db.getLedger(args.shopName, args.date));
+          } else if (toolName === "getDeliveries") {
+            resultStr = JSON.stringify(db.getDeliveries(args.shopName, args.startDate, args.endDate, args.itemName));
+          } else if (toolName === "getOutstandingBalance") {
+            resultStr = JSON.stringify(db.getOutstandingBalance(args.shopName));
+          } else if (toolName === "getUnpricedItems") {
+            resultStr = JSON.stringify(db.getUnpricedItems(args.date));
+          } else if (toolName === "getPurchaseHistory") {
+            resultStr = JSON.stringify(db.getPurchaseHistory(args.startDate, args.endDate, args.itemName));
+          } else if (toolName === "getPendingApprovals") {
+            resultStr = JSON.stringify(db.getPendingApprovals());
+          } else {
+            throw new Error(`Unknown tool name: ${toolName}`);
+          }
+        } catch (err: any) {
+          resultStr = `Error: ${err.message}`;
         }
-      } catch (err: any) {
-        resultStr = `Error: ${err.message}`;
-        executionError = true;
+
+        toolResponses.push({
+          functionResponse: {
+            name: toolName,
+            response: { result: resultStr }
+          }
+        });
+        executedTools.push(toolName);
+        toolResults.push({ tool: toolName, args, result: resultStr });
       }
 
       const modelContent = response.candidates?.[0]?.content || {
         role: 'model',
-        parts: [{ functionCall: { name: toolName, args } }]
+        parts: calls.map(c => ({ functionCall: c }))
       };
 
       const history: Content[] = [
@@ -485,12 +496,7 @@ export async function processVoiceInput(
         modelContent,
         { 
           role: 'user', 
-          parts: [{ 
-            functionResponse: {
-              name: toolName,
-              response: { result: resultStr }
-            }
-          }] 
+          parts: toolResponses
         }
       ];
 
@@ -505,8 +511,8 @@ export async function processVoiceInput(
       console.log("[Gemini API] PATH: REAL API success (second pass)");
       return {
         responseText: followUp.text || "",
-        toolExecuted: toolName || null,
-        toolResult: { ...args, executionResult: resultStr }
+        toolExecuted: executedTools.join(", "),
+        toolResult: toolResults
       };
     } else {
       // Direct text response
