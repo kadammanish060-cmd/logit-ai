@@ -176,6 +176,80 @@ const REJECT_ENTRY_TOOL = {
   }
 };
 
+const GET_LEDGER_TOOL = {
+  name: "getLedger",
+  description: "Retrieve the ledger details (status, total bill, list of items) for a shop on a specific date.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { type: Type.STRING, description: "Name of the shop." },
+      date: { type: Type.STRING, description: "Date of the ledger (YYYY-MM-DD)." }
+    },
+    required: ["shopName", "date"]
+  }
+};
+
+const GET_DELIVERIES_TOOL = {
+  name: "getDeliveries",
+  description: "Retrieve a list of deliveries for a shop over a date range.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { type: Type.STRING, description: "Name of the shop." },
+      startDate: { type: Type.STRING, description: "Start date (YYYY-MM-DD)." },
+      endDate: { type: Type.STRING, description: "End date (YYYY-MM-DD)." },
+      itemName: { type: Type.STRING, description: "Optional name of the vegetable/item to filter by." }
+    },
+    required: ["shopName", "startDate", "endDate"]
+  }
+};
+
+const GET_OUTSTANDING_BALANCE_TOOL = {
+  name: "getOutstandingBalance",
+  description: "Retrieve outstanding balance(s) for a specific shop, or all shops if shopName is not provided.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      shopName: { type: Type.STRING, description: "Optional name of the shop." }
+    }
+  }
+};
+
+const GET_UNPRICED_ITEMS_TOOL = {
+  name: "getUnpricedItems",
+  description: "Retrieve a list of shops and their unpriced delivery items for a specific date.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      date: { type: Type.STRING, description: "Date of interest (YYYY-MM-DD)." }
+    },
+    required: ["date"]
+  }
+};
+
+const GET_PURCHASE_HISTORY_TOOL = {
+  name: "getPurchaseHistory",
+  description: "Retrieve purchase history over a date range.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      startDate: { type: Type.STRING, description: "Start date (YYYY-MM-DD)." },
+      endDate: { type: Type.STRING, description: "End date (YYYY-MM-DD)." },
+      itemName: { type: Type.STRING, description: "Optional name of the vegetable/item to filter by." }
+    },
+    required: ["startDate", "endDate"]
+  }
+};
+
+const GET_PENDING_APPROVALS_TOOL = {
+  name: "getPendingApprovals",
+  description: "Retrieve all pending approval requests for review.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {}
+  }
+};
+
 const GEMINI_TOOLS = [
   {
     functionDeclarations: [
@@ -186,7 +260,13 @@ const GEMINI_TOOLS = [
       LOCK_LEDGER_TOOL,
       GENERATE_INVOICE_TOOL,
       APPROVE_ENTRY_TOOL,
-      REJECT_ENTRY_TOOL
+      REJECT_ENTRY_TOOL,
+      GET_LEDGER_TOOL,
+      GET_DELIVERIES_TOOL,
+      GET_OUTSTANDING_BALANCE_TOOL,
+      GET_UNPRICED_ITEMS_TOOL,
+      GET_PURCHASE_HISTORY_TOOL,
+      GET_PENDING_APPROVALS_TOOL
     ]
   }
 ];
@@ -376,6 +456,18 @@ export async function processVoiceInput(
           resultStr = db.approveEntry(args.approvalId);
         } else if (toolName === "rejectEntry") {
           resultStr = db.rejectEntry(args.approvalId);
+        } else if (toolName === "getLedger") {
+          resultStr = JSON.stringify(db.getLedger(args.shopName, args.date));
+        } else if (toolName === "getDeliveries") {
+          resultStr = JSON.stringify(db.getDeliveries(args.shopName, args.startDate, args.endDate, args.itemName));
+        } else if (toolName === "getOutstandingBalance") {
+          resultStr = JSON.stringify(db.getOutstandingBalance(args.shopName));
+        } else if (toolName === "getUnpricedItems") {
+          resultStr = JSON.stringify(db.getUnpricedItems(args.date));
+        } else if (toolName === "getPurchaseHistory") {
+          resultStr = JSON.stringify(db.getPurchaseHistory(args.startDate, args.endDate, args.itemName));
+        } else if (toolName === "getPendingApprovals") {
+          resultStr = JSON.stringify(db.getPendingApprovals());
         } else {
           throw new Error(`Unknown tool name: ${toolName}`);
         }
