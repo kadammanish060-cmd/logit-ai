@@ -1,4 +1,4 @@
-const apiKey = process.env.SARVAM_API_KEY;
+const apiKey = process.env.EXPO_PUBLIC_SARVAM_API_KEY || process.env.SARVAM_API_KEY;
 const USE_REAL_SARVAM = apiKey && apiKey !== "YOUR_SARVAM_KEY";
 
 console.log("[Sarvam AI] Voice Service initialized. USE_REAL_SARVAM:", !!USE_REAL_SARVAM);

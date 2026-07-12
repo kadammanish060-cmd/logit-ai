@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type, Content } from '@google/genai';
 import * as db from "./db";
 
-const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
 const USE_REAL_GEMINI = true && apiKey !== "" && apiKey !== "YOUR_API_KEY";
 
 const ai = USE_REAL_GEMINI ? new GoogleGenAI({ apiKey }) : null;
