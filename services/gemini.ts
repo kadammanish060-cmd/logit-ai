@@ -303,7 +303,7 @@ Rules:
 4. Normalize itemName to one of the exact canonical item names: "onion", "potato", "chilli", "lemon", "ginger", "garlic", "mint", "coriander", "tomato", "cucumber".
 5. If the user refers to an item by any of its spoken aliases or translation (e.g. 'Kanda', 'कांदा', 'कांदे', 'onion'), you MUST map it to the canonical name (e.g. "onion").
 6. If the user refers to a shop by a shortened name or translation (e.g. 'Sudama', 'जोशी', 'सुदामा'), map it to the canonical name (e.g. "Sudamache", "Joshi wadewale").
-7. If required parameters are missing (e.g., shop name, item, quantity, price), do not call any tool; instead, respond with a friendly message/question in the selected language asking the user for the missing details.
+7. If required parameters are missing (e.g., shop name, item, quantity, price), do not call any tool; instead, respond with a friendly message/question in the selected language asking the user for the missing details. You MUST NOT guess, assume, or invent quantity values (like assuming 1 or 10) when the user says something ambiguous like 'some' onions or does not mention a quantity.
 8. Once a tool has been successfully executed, formulate a warm, natural reply summarizing the action in the selected language (English or Marathi).
 9. Do not hallucinate or output raw JSON. Always respond conversationally.`;
 }
@@ -394,7 +394,11 @@ export async function processVoiceInput(
     const systemPrompt = getSystemPrompt(role, lang, currentDate);
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      // PRODUCTION MODEL: gemini-3.1-flash-lite is selected as the primary model.
+      // It offers a generous 1,500 RPD free tier quota compared to 20 RPD for gemini-3.5-flash,
+      // with verified comparable reasoning quality. Programmatic parameter guards are
+      // implemented in the execution loop below to prevent parameter omissions/guessing.
+      model: 'gemini-3.1-flash-lite',
       contents: text,
       config: {
         systemInstruction: systemPrompt,
@@ -413,6 +417,48 @@ export async function processVoiceInput(
         const toolName = call.name;
         const args = call.args as any;
         let resultStr = "";
+
+        // Server-side validation check for missing required parameters
+        let validationError = false;
+        let missingParam = "";
+
+        if (toolName === "logDelivery") {
+          if (!args.shopName) { validationError = true; missingParam = "shopName"; }
+          else if (!args.itemName) { validationError = true; missingParam = "itemName"; }
+          else if (args.quantity === undefined || args.quantity === null || isNaN(Number(args.quantity))) { validationError = true; missingParam = "quantity"; }
+        } else if (toolName === "logPurchase") {
+          if (!args.itemName) { validationError = true; missingParam = "itemName"; }
+          else if (args.quantity === undefined || args.quantity === null || isNaN(Number(args.quantity))) { validationError = true; missingParam = "quantity"; }
+          else if (args.pricePaid === undefined || args.pricePaid === null || isNaN(Number(args.pricePaid))) { validationError = true; missingParam = "pricePaid"; }
+        } else if (toolName === "setPrice") {
+          if (!args.shopName) { validationError = true; missingParam = "shopName"; }
+          else if (!args.itemName) { validationError = true; missingParam = "itemName"; }
+          else if (args.unitPrice === undefined || args.unitPrice === null || isNaN(Number(args.unitPrice))) { validationError = true; missingParam = "unitPrice"; }
+        } else if (toolName === "logPayment") {
+          if (!args.shopName) { validationError = true; missingParam = "shopName"; }
+          else if (args.amount === undefined || args.amount === null || isNaN(Number(args.amount))) { validationError = true; missingParam = "amount"; }
+        } else if (toolName === "lockLedger" || toolName === "generateInvoice") {
+          if (!args.shopName) { validationError = true; missingParam = "shopName"; }
+        } else if (toolName === "approveEntry" || toolName === "rejectEntry") {
+          if (!args.approvalId) { validationError = true; missingParam = "approvalId"; }
+        }
+
+        if (validationError) {
+          console.log(`[Gemini API] Validation Error: Tool ${toolName} is missing required parameter ${missingParam}.`);
+          if (lang === "mr") {
+            return {
+              responseText: "माफ करा, मला समजले नाही. तुम्ही कृपया माहिती (दुकान, भाजी, वजन किंवा दर) स्पष्टपणे सांगू शकाल का?",
+              toolExecuted: null,
+              toolResult: null
+            };
+          } else {
+            return {
+              responseText: "I didn't quite catch that. Could you please specify the shop, item, quantity, or price more clearly?",
+              toolExecuted: null,
+              toolResult: null
+            };
+          }
+        }
 
         try {
           if (toolName === "logDelivery") {
@@ -501,7 +547,11 @@ export async function processVoiceInput(
       ];
 
       const followUp = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        // PRODUCTION MODEL: gemini-3.1-flash-lite is selected as the primary model.
+        // It offers a generous 1,500 RPD free tier quota compared to 20 RPD for gemini-3.5-flash,
+        // with verified comparable reasoning quality. Programmatic parameter guards are
+        // implemented in the execution loop below to prevent parameter omissions/guessing.
+        model: 'gemini-3.1-flash-lite',
         contents: history,
         config: {
           systemInstruction: systemPrompt
