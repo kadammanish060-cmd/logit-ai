@@ -385,6 +385,7 @@ export async function processVoiceInput(
   console.log(`[Gemini API] processVoiceInput. USE_REAL_GEMINI: ${USE_REAL_GEMINI}`);
 
   if (!USE_REAL_GEMINI || !ai) {
+    console.log("[Gemini API] PATH: MOCK fallback (no API key)");
     // FALLBACK TO THE ORIGINAL MOCK CLASSIFIER
     return processVoiceInputMock(text, role, lang);
   }
@@ -393,9 +394,7 @@ export async function processVoiceInput(
     const systemPrompt = getSystemPrompt(role, lang, currentDate);
 
     const response = await ai.models.generateContent({
-      // TECHNICAL DEBT: gemini-2.5-flash is temporarily unavailable for new API keys with the v2 SDK.
-      // Falling back to gemini-2.0-flash until upstream API key access is resolved.
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash',
       contents: text,
       config: {
         systemInstruction: systemPrompt,
@@ -403,6 +402,7 @@ export async function processVoiceInput(
       }
     });
 
+    console.log("[Gemini API] PATH: REAL API success (first pass)");
     const calls = response.functionCalls;
     if (calls && calls.length > 0) {
       const call = calls[0];
@@ -495,15 +495,14 @@ export async function processVoiceInput(
       ];
 
       const followUp = await ai.models.generateContent({
-        // TECHNICAL DEBT: gemini-2.5-flash is temporarily unavailable for new API keys with the v2 SDK.
-        // Falling back to gemini-2.0-flash until upstream API key access is resolved.
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.5-flash',
         contents: history,
         config: {
           systemInstruction: systemPrompt
         }
       });
 
+      console.log("[Gemini API] PATH: REAL API success (second pass)");
       return {
         responseText: followUp.text || "",
         toolExecuted: toolName || null,
@@ -511,6 +510,7 @@ export async function processVoiceInput(
       };
     } else {
       // Direct text response
+      console.log("[Gemini API] PATH: REAL API success (direct response)");
       return {
         responseText: response.text || "",
         toolExecuted: null,
@@ -518,7 +518,8 @@ export async function processVoiceInput(
       };
     }
   } catch (error: any) {
-    console.error("Gemini API call failed, falling back to mock:", error);
+    console.log(`[Gemini API] PATH: REAL API error: ${error.message}`);
+    console.log("[Gemini API] PATH: MOCK fallback");
     return processVoiceInputMock(text, role, lang);
   }
 }
