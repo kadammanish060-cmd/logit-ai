@@ -1,5 +1,3 @@
-import { SarvamAIClient } from 'sarvamai';
-
 const apiKey = process.env.SARVAM_API_KEY;
 const USE_REAL_SARVAM = apiKey && apiKey !== "YOUR_SARVAM_KEY";
 
@@ -16,17 +14,27 @@ export async function transcribeAudio(audioBlobUrl: string): Promise<string> {
   try {
     const responseBlob = await fetch(audioBlobUrl);
     const blob = await responseBlob.blob();
-    const file = new File([blob], "recording.wav", { type: "audio/wav" });
 
-    const client = new SarvamAIClient({ apiSubscriptionKey: apiKey });
-    const res = await client.speechToText.transcribe({
-      file: file as any,
-      model: "saaras:v3",
-      language_code: "unknown" // auto-detect language
+    const formData = new FormData();
+    formData.append("file", blob, "recording.wav");
+    formData.append("model", "saaras:v3");
+    formData.append("language_code", "unknown");
+
+    const response = await fetch("https://api.sarvam.ai/speech-to-text", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": apiKey || ""
+      },
+      body: formData
     });
 
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
+
     console.log("[Sarvam AI] transcribeAudio. PATH: REAL API success");
-    return res.transcript || "";
+    return data.transcript || "";
   } catch (error: any) {
     console.log(`[Sarvam AI] transcribeAudio. PATH: REAL API error: ${error.message}`);
     console.log("[Sarvam AI] transcribeAudio. PATH: MOCK fallback");
@@ -61,20 +69,30 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
   }
 
   try {
-    const client = new SarvamAIClient({ apiSubscriptionKey: apiKey });
     const target_lang = language === "mr" ? "mr-IN" : "en-IN";
-
-    const res = await client.textToSpeech.convert({
-      text,
-      target_language_code: target_lang,
-      model: "bulbul:v3",
-      speaker: "shruti"
+    const response = await fetch("https://api.sarvam.ai/text-to-speech", {
+      method: "POST",
+      headers: {
+        "api-subscription-key": apiKey || "",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        text,
+        target_language_code: target_lang,
+        model: "bulbul:v3",
+        speaker: "shruti"
+      })
     });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
 
     console.log("[Sarvam AI] synthesizeSpeech. PATH: REAL API success");
 
-    if (res.audios && res.audios.length > 0) {
-      const base64Audio = res.audios[0];
+    if (data.audios && data.audios.length > 0) {
+      const base64Audio = data.audios[0];
       if (typeof window !== "undefined") {
         const audioSrc = `data:audio/wav;base64,${base64Audio}`;
         const audio = new Audio(audioSrc);
@@ -163,32 +181,39 @@ export async function startStreamingSTT(
   }
 
   try {
-    const client = new SarvamAIClient({ apiSubscriptionKey: apiKey });
     const target_lang = language === "mr" ? "mr-IN" : "en-IN";
+    const wsUrl = `wss://api.sarvam.ai/speech-to-text/ws?language-code=${target_lang}`;
+    const protocols = [`api-subscription-key.${apiKey}`];
 
-    const socket = await client.speechToTextStreaming.connect({
-      "language-code": target_lang as any,
-      "Api-Subscription-Key": apiKey || ""
-    });
+    const ws = new WebSocket(wsUrl, protocols);
 
-    socket.on('message', (msg: any) => {
-      if (msg.type === "transcription" || msg.type === "transcript") {
-        onTranscript(msg.data?.transcript || "");
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "transcription" || msg.type === "transcript") {
+          onTranscript(msg.data?.transcript || "");
+        }
+      } catch (err) {
+        console.error("STT message parse error:", err);
       }
-    });
+    };
 
-    socket.on('error', (err: any) => {
-      onError(err);
-    });
+    ws.onerror = (event: any) => {
+      onError(event.error || new Error("WebSocket error"));
+    };
 
-    socket.connect();
+    ws.onclose = () => {
+      console.log("[Sarvam AI] Streaming STT connection closed");
+    };
 
     return {
       sendAudioChunk: (base64Audio: string) => {
-        socket.transcribe({ audio: base64Audio });
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ audio: base64Audio }));
+        }
       },
       stop: () => {
-        socket.close();
+        ws.close();
       }
     };
   } catch (error: any) {
@@ -217,38 +242,47 @@ export async function startStreamingTTS(
   }
 
   try {
-    const client = new SarvamAIClient({ apiSubscriptionKey: apiKey });
     const target_lang = language === "mr" ? "mr-IN" : "en-IN";
+    const wsUrl = `wss://api.sarvam.ai/text-to-speech/ws`;
+    const protocols = [`api-subscription-key.${apiKey}`];
 
-    const socket = await client.textToSpeechStreaming.connect({
-      "Api-Subscription-Key": apiKey || ""
-    });
+    const ws = new WebSocket(wsUrl, protocols);
 
-    socket.on('message', (msg: any) => {
-      if (msg.type === "audio") {
-        onAudioData(msg.data?.audio || "");
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        target_language_code: target_lang,
+        speaker: "shruti",
+        output_audio_codec: "linear16"
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "audio") {
+          onAudioData(msg.data?.audio || "");
+        }
+      } catch (err) {
+        console.error("TTS message parse error:", err);
       }
-    });
+    };
 
-    socket.on('error', (err: any) => {
-      onError(err);
-    });
+    ws.onerror = (event: any) => {
+      onError(event.error || new Error("WebSocket error"));
+    };
 
-    socket.connect();
-    socket.configureConnection({
-      // NOTE: Typecast configuration params to 'any' because the streaming SDK Socket type definitions 
-      // are a subset of the full REST bulbul:v3 capabilities, but the underlying API accepts these parameters.
-      target_language_code: target_lang as any,
-      speaker: "shruti" as any,
-      output_audio_codec: "linear16" as any
-    });
+    ws.onclose = () => {
+      console.log("[Sarvam AI] Streaming TTS connection closed");
+    };
 
     return {
       sendText: (text: string) => {
-        socket.convert(text);
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify({ text }));
+        }
       },
       stop: () => {
-        socket.close();
+        ws.close();
       }
     };
   } catch (error: any) {
