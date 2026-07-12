@@ -236,6 +236,8 @@ export async function startStreamingTTS(
 
     socket.connect();
     socket.configureConnection({
+      // NOTE: Typecast configuration params to 'any' because the streaming SDK Socket type definitions 
+      // are a subset of the full REST bulbul:v3 capabilities, but the underlying API accepts these parameters.
       target_language_code: target_lang as any,
       speaker: "shruti" as any,
       output_audio_codec: "linear16" as any
