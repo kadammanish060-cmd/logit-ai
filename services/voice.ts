@@ -12,19 +12,22 @@ export async function transcribeAudio(audioBlobUrl: string): Promise<string> {
   console.log("[Sarvam AI] transcribeAudio. USE_REAL_SARVAM:", !!USE_REAL_SARVAM);
 
   if (!USE_REAL_SARVAM) {
-    // Fallback Mock Transcript
+    console.log("[Sarvam AI] transcribeAudio. PATH: MOCK fallback");
     return "Simulated speech transcript";
   }
 
   try {
+    console.log("[Sarvam AI] Fetching blob from local URI:", audioBlobUrl);
     const responseBlob = await fetch(audioBlobUrl);
     const blob = await responseBlob.blob();
+    console.log("[Sarvam AI] Local blob size:", blob.size, "bytes, type:", blob.type);
 
     const formData = new FormData();
     formData.append("file", blob, "recording.wav");
     formData.append("model", "saaras:v3");
     formData.append("language_code", "unknown");
 
+    console.log("[Sarvam AI] Sending STT REST request to Sarvam API...");
     const response = await fetch("https://api.sarvam.ai/speech-to-text", {
       method: "POST",
       headers: {
@@ -33,12 +36,14 @@ export async function transcribeAudio(audioBlobUrl: string): Promise<string> {
       body: formData
     });
 
+    console.log("[Sarvam AI] STT Response received. Status:", response.status);
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.message || `HTTP ${response.status}`);
     }
 
     console.log("[Sarvam AI] transcribeAudio. PATH: REAL API success");
+    console.log("[Sarvam AI] STT Transcribed text:", JSON.stringify(data.transcript));
     return data.transcript || "";
   } catch (error: any) {
     console.log(`[Sarvam AI] transcribeAudio. PATH: REAL API error: ${error.message}`);
@@ -201,6 +206,7 @@ export function startContinuousListening(
     const startRecording = async () => {
       try {
         const permission = await requestRecordingPermissionsAsync();
+        console.log("[Sarvam AI] Microphone permission status:", permission.status, "granted:", permission.granted);
         if (!permission.granted) {
           onError("Microphone permission not granted");
           return;
@@ -211,17 +217,21 @@ export function startContinuousListening(
           allowsRecording: true,
           playsInSilentMode: true,
         });
+        console.log("[Sarvam AI] Audio session configured for recording.");
 
         const recorder = new AudioModule.AudioRecorder({});
         recorderInstance = recorder;
 
+        console.log("[Sarvam AI] Preparing AudioRecorder...");
         await recorder.prepareToRecordAsync();
         if (isStopped) {
+          console.log("[Sarvam AI] Recording was stopped before it could start.");
           return;
         }
         recorder.record();
+        console.log("[Sarvam AI] Native recording started.");
       } catch (err: any) {
-        console.error("Audio recording preparation error:", err);
+        console.error("[Sarvam AI] Audio recording preparation error:", err);
         onError(err.message || err);
       }
     };
@@ -234,9 +244,23 @@ export function startContinuousListening(
         const performStop = async () => {
           try {
             if (recorderInstance) {
+              console.log("[Sarvam AI] Stopping Native recording...");
               await recorderInstance.stop();
+              console.log("[Sarvam AI] Native recording stopped.");
               const uri = recorderInstance.uri;
+              console.log("[Sarvam AI] Recording URI captured:", uri);
               if (uri) {
+                try {
+                  const fileInfo = await FileSystem.getInfoAsync(uri);
+                  if (fileInfo.exists) {
+                    console.log("[Sarvam AI] Recording file info: exists=true, size=" + fileInfo.size + " bytes");
+                  } else {
+                    console.log("[Sarvam AI] Recording file info: exists=false");
+                  }
+                } catch (fiErr) {
+                  console.error("[Sarvam AI] Error getting recording file info:", fiErr);
+                }
+
                 // Call transcribeAudio to transcribe with Sarvam AI REST API
                 const transcript = await transcribeAudio(uri);
                 onResult(transcript);
@@ -245,13 +269,14 @@ export function startContinuousListening(
               }
             }
           } catch (err: any) {
-            console.error("Stop recording and transcribe error:", err);
+            console.error("[Sarvam AI] Stop recording and transcribe error:", err);
             onError(err.message || err);
           } finally {
             // Reset audio mode back to playback
             await setAudioModeAsync({
               allowsRecording: false,
             }).catch(() => {});
+            console.log("[Sarvam AI] Audio session reset back to playback.");
           }
         };
         performStop();

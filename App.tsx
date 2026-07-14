@@ -223,6 +223,7 @@ export default function App() {
   // Active call duration timer reference
   const callTimerRef = useRef<any>(null);
   const ringingTimeoutRef = useRef<any>(null);
+  const recognitionRef = useRef<any>(null);
 
   // Load database on start
   useEffect(() => {
@@ -278,32 +279,44 @@ export default function App() {
   };
 
   // Quick Voice Note mic handler
+  // Quick Voice Note mic handler
   const handleMicPress = () => {
     if (isListening) {
+      console.log("[UI] Mic tapped again. Stopping recording manually...");
       setIsListening(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
       return;
     }
 
+    console.log("[UI] Mic tapped. Starting recording...");
     setRecognizedText('');
     setIsListening(true);
 
     const recognition = startContinuousListening(
       async (resultText) => {
+        console.log("[UI] STT transcription callback received result:", JSON.stringify(resultText));
         setIsListening(false);
         setRecognizedText(resultText);
         await submitTextInput(resultText);
       },
       (errorMsg) => {
         setIsListening(false);
-        console.error("Speech Error: ", errorMsg);
+        console.error("[UI] Speech Error callback: ", errorMsg);
       },
       language
     );
 
+    recognitionRef.current = recognition;
+
     setTimeout(() => {
-      if (isListening) {
+      if (recognitionRef.current) {
+        console.log("[UI] 6s recording limit reached. Stopping automatically...");
         setIsListening(false);
-        recognition.stop();
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
       }
     }, 6000);
   };
@@ -312,6 +325,7 @@ export default function App() {
     if (!inputStr.trim()) return;
     setIsProcessing(true);
     setAiSpeechOutput('');
+    console.log("[Gemini API] submitTextInput. Triggering Gemini NLP for text:", JSON.stringify(inputStr));
 
     try {
       const result = await processVoiceInput(inputStr, role, language);
