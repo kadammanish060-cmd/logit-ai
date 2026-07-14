@@ -17,13 +17,21 @@ export async function transcribeAudio(audioBlobUrl: string): Promise<string> {
   }
 
   try {
-    console.log("[Sarvam AI] Fetching blob from local URI:", audioBlobUrl);
-    const responseBlob = await fetch(audioBlobUrl);
-    const blob = await responseBlob.blob();
-    console.log("[Sarvam AI] Local blob size:", blob.size, "bytes, type:", blob.type);
-
     const formData = new FormData();
-    formData.append("file", blob, "recording.wav");
+    if (Platform.OS === 'web') {
+      console.log("[Sarvam AI] Web Mode: Fetching blob from URI:", audioBlobUrl);
+      const responseBlob = await fetch(audioBlobUrl);
+      const blob = await responseBlob.blob();
+      console.log("[Sarvam AI] Web Blob size:", blob.size, "bytes");
+      formData.append("file", blob, "recording.wav");
+    } else {
+      console.log("[Sarvam AI] Native Mode: Appending local URI to FormData:", audioBlobUrl);
+      formData.append("file", {
+        uri: audioBlobUrl,
+        type: "audio/wav",
+        name: "recording.wav"
+      } as any);
+    }
     formData.append("model", "saaras:v3");
     formData.append("language_code", "unknown");
 
