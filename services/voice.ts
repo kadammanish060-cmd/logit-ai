@@ -1,5 +1,6 @@
-import { createAudioPlayer } from 'expo-audio';
+import { createAudioPlayer, AudioModule, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
+import { EncodingType } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 const apiKey = process.env.EXPO_PUBLIC_SARVAM_API_KEY || process.env.SARVAM_API_KEY;
@@ -84,7 +85,8 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
         text,
         target_language_code: target_lang,
         model: "bulbul:v3",
-        speaker: "shruti"
+        speaker: "shruti",
+        output_audio_codec: "mp3"
       })
     });
 
@@ -99,7 +101,7 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
       const base64Audio = data.audios[0];
       if (Platform.OS === 'web') {
         if (typeof Audio !== "undefined") {
-          const audioSrc = `data:audio/wav;base64,${base64Audio}`;
+          const audioSrc = `data:audio/mp3;base64,${base64Audio}`;
           const audio = new Audio(audioSrc);
           return new Promise((resolve) => {
             audio.onended = () => resolve();
@@ -113,10 +115,12 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
       } else {
         // Native mobile build (Android / iOS)
         try {
-          const tempUri = `${FileSystem.cacheDirectory}temp_tts.wav`;
+          const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
+          const tempUri = `${cacheDir}temp_tts.mp3`;
           const base64Data = base64Audio.replace(/^data:audio\/\w+;base64,/, "");
+          
           await FileSystem.writeAsStringAsync(tempUri, base64Data, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: EncodingType.Base64,
           });
 
           const player = createAudioPlayer(tempUri);
@@ -153,44 +157,107 @@ export async function synthesizeSpeech(text: string, language: "en" | "mr" = "en
   }
 }
 
-// Continuous Listening Web Speech API Fallback
+// Continuous Listening Web Speech API Fallback (with Expo AudioRecorder on Native Mobile)
 export function startContinuousListening(
   onResult: (text: string) => void,
-  onError: (err: string) => void,
+  onError: (err: any) => void,
   language: "en" | "mr" = "en"
 ): { stop: () => void } {
-  if (typeof window !== "undefined") {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = language === "mr" ? "mr-IN" : "en-US";
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        onResult(transcript);
-      };
-
-      recognition.onerror = (event: any) => {
-        onError(event.error);
-      };
-
-      recognition.start();
-      return {
-        stop: () => {
-          try {
-            recognition.stop();
-          } catch(e) {}
-        }
-      };
-    }
-  }
-
   if (Platform.OS === 'web') {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = language === "mr" ? "mr-IN" : "en-US";
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          onResult(transcript);
+        };
+
+        recognition.onerror = (event: any) => {
+          onError(event.error);
+        };
+
+        recognition.start();
+        return {
+          stop: () => {
+            try {
+              recognition.stop();
+            } catch(e) {}
+          }
+        };
+      }
+    }
     console.warn("SpeechRecognition not supported in this environment");
+    return { stop: () => {} };
+  } else {
+    // Native mobile build (Android / iOS) using expo-audio's recording API
+    let recorderInstance: any = null;
+    let isStopped = false;
+
+    const startRecording = async () => {
+      try {
+        const permission = await requestRecordingPermissionsAsync();
+        if (!permission.granted) {
+          onError("Microphone permission not granted");
+          return;
+        }
+
+        // Configure audio mode for recording
+        await setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        });
+
+        const recorder = new AudioModule.AudioRecorder({});
+        recorderInstance = recorder;
+
+        await recorder.prepareToRecordAsync();
+        if (isStopped) {
+          return;
+        }
+        recorder.record();
+      } catch (err: any) {
+        console.error("Audio recording preparation error:", err);
+        onError(err.message || err);
+      }
+    };
+
+    startRecording();
+
+    return {
+      stop: () => {
+        isStopped = true;
+        const performStop = async () => {
+          try {
+            if (recorderInstance) {
+              await recorderInstance.stop();
+              const uri = recorderInstance.uri;
+              if (uri) {
+                // Call transcribeAudio to transcribe with Sarvam AI REST API
+                const transcript = await transcribeAudio(uri);
+                onResult(transcript);
+              } else {
+                onError("No recording URI found");
+              }
+            }
+          } catch (err: any) {
+            console.error("Stop recording and transcribe error:", err);
+            onError(err.message || err);
+          } finally {
+            // Reset audio mode back to playback
+            await setAudioModeAsync({
+              allowsRecording: false,
+            }).catch(() => {});
+          }
+        };
+        performStop();
+      }
+    };
   }
-  return { stop: () => {} };
 }
 
 // WebSocket Streaming STT wrapper for Call Mode
