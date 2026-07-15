@@ -12,6 +12,7 @@ import {
   SafeAreaView,
   Pressable,
   Platform,
+  Alert,
 } from 'react-native';
 import * as db from './services/db';
 import { processVoiceInput } from './services/gemini';
@@ -29,6 +30,10 @@ import {
   CheckSquare,
   Settings as SettingsIcon,
   Folder,
+  MessageSquare,
+  History,
+  Info,
+  PlusCircle,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -201,6 +206,7 @@ export default function App() {
 
   // Navigation
   const [currentTab, setCurrentTab] = useState<'home' | 'ledger' | 'approvals' | 'settings'>('home');
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
 
   // Input states
   const [textCommand, setTextCommand] = useState('');
@@ -1172,78 +1178,121 @@ export default function App() {
         {/* Panel */}
         <Animated.View style={[styles.drawerPanel, animatedDrawerStyle]}>
           <View style={styles.drawerHeader}>
-            <Text style={styles.drawerTitle}>{t.appTitle}</Text>
+            <Text style={styles.drawerTitle}>Logit AI</Text>
             <TouchableOpacity style={styles.drawerCloseBtn} onPress={handleCloseDrawer}>
-              <X size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
+              <X size={22} color={Theme.colors.primaryText} strokeWidth={1.5} />
             </TouchableOpacity>
           </View>
 
           {/* New Chat Button */}
           <TouchableOpacity style={styles.newChatBtn} onPress={() => handleNavPress('home')}>
             <Text style={styles.newChatBtnText}>New Chat</Text>
-            <Plus size={20} color={Theme.colors.primaryText} strokeWidth={1.5} />
+            <Plus size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
           </TouchableOpacity>
 
           <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerScrollContent}>
-            {/* Conversations / Navigation Section */}
-            <Text style={styles.drawerSectionHeader}>Navigation</Text>
-            
+            {/* History Section */}
             <TouchableOpacity
               style={[styles.drawerNavItem, currentTab === 'home' && styles.drawerNavItemActive]}
               onPress={() => handleNavPress('home')}
             >
-              <HomeIcon size={20} color={currentTab === 'home' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
-              <Text style={[styles.drawerNavText, currentTab === 'home' && styles.drawerNavTextActive]}>{t.tabHome}</Text>
+              <MessageSquare size={18} color={currentTab === 'home' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={[styles.drawerNavText, currentTab === 'home' && styles.drawerNavTextActive]}>Conversation History</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.drawerNavItem, currentTab === 'ledger' && styles.drawerNavItemActive]}
-              onPress={() => handleNavPress('ledger')}
+              style={styles.drawerNavItem}
+              onPress={() => {
+                handleCloseDrawer();
+                Alert.alert(
+                  language === 'mr' ? 'व्हॉइस इतिहास' : 'Voice History',
+                  language === 'mr' ? 'सर्व व्हॉइस नोट्स लेजरमध्ये सुरक्षितपणे जतन केल्या आहेत.' : 'All voice notes are securely recorded in the Ledger.',
+                  [{ text: 'OK', style: 'cancel' }]
+                );
+              }}
             >
-              <BookOpen size={20} color={currentTab === 'ledger' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
-              <Text style={[styles.drawerNavText, currentTab === 'ledger' && styles.drawerNavTextActive]}>{t.tabLedger}</Text>
+              <History size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={styles.drawerNavText}>Voice History</Text>
             </TouchableOpacity>
 
-            {role === 'admin' && (
-              <TouchableOpacity
-                style={[styles.drawerNavItem, currentTab === 'approvals' && styles.drawerNavItemActive]}
-                onPress={() => handleNavPress('approvals')}
-              >
-                <CheckSquare size={20} color={currentTab === 'approvals' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
-                <Text style={[styles.drawerNavText, currentTab === 'approvals' && styles.drawerNavTextActive]}>{t.tabApprovals}</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={[styles.drawerNavItem, currentTab === 'settings' && styles.drawerNavItemActive]}
-              onPress={() => handleNavPress('settings')}
-            >
-              <SettingsIcon size={20} color={currentTab === 'settings' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
-              <Text style={[styles.drawerNavText, currentTab === 'settings' && styles.drawerNavTextActive]}>{t.tabSettings}</Text>
-            </TouchableOpacity>
+            {/* Divider */}
+            <View style={styles.drawerDivider} />
 
             {/* Shops Section */}
             <Text style={styles.drawerSectionHeader}>Shops</Text>
-            {shops.map(shop => (
-              <TouchableOpacity
-                key={shop.id}
-                style={styles.drawerShopItem}
-                onPress={() => handleNavPress('ledger')}
-              >
-                <Folder size={18} color={Theme.colors.accent} strokeWidth={1.5} />
-                <Text style={styles.drawerShopText} numberOfLines={1}>{shop.name}</Text>
-              </TouchableOpacity>
-            ))}
+            {shops.map(shop => {
+              const isSelected = selectedShopId === shop.id;
+              return (
+                <TouchableOpacity
+                  key={shop.id}
+                  style={[
+                    styles.drawerShopCard,
+                    isSelected && styles.drawerShopCardSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedShopId(shop.id);
+                    handleNavPress('ledger');
+                  }}
+                >
+                  <Folder size={18} color={isSelected ? Theme.colors.accent : Theme.colors.secondaryText} strokeWidth={1.5} />
+                  <Text
+                    style={[
+                      styles.drawerShopCardText,
+                      isSelected && styles.drawerShopCardTextSelected
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {shop.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
           {/* Footer Section */}
           <View style={styles.drawerFooter}>
-            <Text style={styles.drawerFooterRole}>
-              {role === 'admin' ? "👑 Admin" : "👤 Normal"}
-            </Text>
-            <Text style={styles.drawerFooterLang}>
-              Language: {language === 'en' ? "English" : "Marathi"}
-            </Text>
+            <TouchableOpacity
+              style={styles.drawerFooterLink}
+              onPress={() => {
+                setSelectedShopId(null);
+                handleNavPress('settings');
+              }}
+            >
+              <PlusCircle size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={styles.drawerFooterLinkText}>Add Shop</Text>
+            </TouchableOpacity>
+
+            {role === 'admin' && (
+              <TouchableOpacity
+                style={styles.drawerFooterLink}
+                onPress={() => handleNavPress('approvals')}
+              >
+                <CheckSquare size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+                <Text style={styles.drawerFooterLinkText}>Approvals</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.drawerFooterLink}
+              onPress={() => handleNavPress('settings')}
+            >
+              <SettingsIcon size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={styles.drawerFooterLinkText}>Settings</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.drawerFooterLink}
+              onPress={() => {
+                Alert.alert(
+                  'About Logit AI',
+                  'Version 1.0.0\n\nA premium voice assistant for store auditing, ledger management, and inventory tracking powered by Gemini and Sarvam AI.',
+                  [{ text: 'OK', style: 'cancel' }]
+                );
+              }}
+            >
+              <Info size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={styles.drawerFooterLinkText}>About</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </View>
@@ -1828,7 +1877,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 300,
-    backgroundColor: Theme.colors.background,
+    backgroundColor: '#000000',
     borderRightWidth: 1,
     borderRightColor: Theme.colors.border,
     paddingTop: Platform.OS === 'ios' ? 40 : 20,
@@ -1903,36 +1952,55 @@ const styles = StyleSheet.create({
     color: Theme.colors.primaryText,
     fontWeight: '600',
   },
-  drawerShopItem: {
+  drawerDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.border,
+    marginVertical: Theme.spacing.md,
+    marginHorizontal: Theme.spacing.xs,
+  },
+  drawerShopCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: Theme.colors.border,
+    backgroundColor: Theme.colors.surface,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.sm,
     marginVertical: Theme.spacing.xs,
   },
-  drawerShopText: {
+  drawerShopCardSelected: {
+    borderColor: Theme.colors.accent,
+    backgroundColor: '#0c1b2f',
+  },
+  drawerShopCardText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: Theme.colors.secondaryText,
     marginLeft: Theme.spacing.sm,
+    flex: 1,
+  },
+  drawerShopCardTextSelected: {
+    color: Theme.colors.primaryText,
+    fontWeight: '600',
   },
   drawerFooter: {
     borderTopWidth: 1,
     borderTopColor: Theme.colors.border,
     paddingHorizontal: Theme.spacing.marginMobile,
-    paddingVertical: Theme.spacing.md,
+    paddingVertical: Theme.spacing.sm,
+    backgroundColor: '#000000',
   },
-  drawerFooterRole: {
+  drawerFooterLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.xs,
+    borderRadius: Theme.radius.button,
+  },
+  drawerFooterLinkText: {
     ...Theme.typography.bodyMd,
-    fontWeight: '600',
-    color: Theme.colors.primaryText,
-  },
-  drawerFooterLang: {
-    ...Theme.typography.labelSm,
-    color: Theme.colors.mutedText,
-    marginTop: Theme.spacing.xs,
+    color: Theme.colors.secondaryText,
+    marginLeft: Theme.spacing.sm,
+    fontWeight: '500',
   },
   onboardContainer: {
     flex: 1,
