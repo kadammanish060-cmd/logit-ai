@@ -39,6 +39,18 @@ import {
   Image as ImageIcon,
   FileText,
   Grid,
+  Store,
+  Lock,
+  Unlock,
+  Coins,
+  Package,
+  Edit2,
+  Share2,
+  Check,
+  AlertTriangle,
+  Clock,
+  Volume2,
+  AlertCircle,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -47,6 +59,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withDelay,
+  withSpring,
 } from 'react-native-reanimated';
 
 // Translation dictionary
@@ -325,10 +338,10 @@ export default function App() {
 
   useEffect(() => {
     if (isDrawerOpen) {
-      drawerTranslateX.value = withTiming(0, { duration: 250 });
+      drawerTranslateX.value = withSpring(0, { damping: 15, stiffness: 100 });
       backdropOpacity.value = withTiming(0.6, { duration: 250 });
     } else {
-      drawerTranslateX.value = withTiming(-300, { duration: 200 });
+      drawerTranslateX.value = withSpring(-300, { damping: 18, stiffness: 120 });
       backdropOpacity.value = withTiming(0, { duration: 200 });
     }
   }, [isDrawerOpen]);
@@ -1690,7 +1703,10 @@ export default function App() {
               return (
                 <View key={shop.id} style={styles.ledgerShopCard}>
                   <View style={styles.ledgerShopHeader}>
-                    <Text style={styles.ledgerShopName}>🏪 {shop.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Store size={18} color={Theme.colors.primaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+                      <Text style={styles.ledgerShopName}>{shop.name}</Text>
+                    </View>
                     <View style={styles.ledgerShopBalance}>
                       <Text style={styles.balanceText}>{t.outstandingBalance}: ₹{shop.outstandingBalance}</Text>
                     </View>
@@ -1700,9 +1716,16 @@ export default function App() {
                     <View>
                       {/* Status indicator */}
                       <View style={styles.ledgerStatusIndicator}>
-                        <Text style={styles.statusBadge}>
-                          Status: {ledger.status === 'locked' ? `🔒 ${t.lockedLabel}` : ledger.status === 'priced' ? "💰 Priced" : "📝 Open"}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          {ledger.status === 'locked' ? (
+                            <Lock size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 4 }} />
+                          ) : (
+                            <Unlock size={14} color={Theme.colors.accent} strokeWidth={1.5} style={{ marginRight: 4 }} />
+                          )}
+                          <Text style={styles.statusBadge}>
+                            {ledger.status === 'locked' ? t.lockedLabel : ledger.status === 'priced' ? "Priced" : "Open"}
+                          </Text>
+                        </View>
                         {ledger.totalBill !== null && (
                           <Text style={styles.totalBillText}>₹{ledger.totalBill}</Text>
                         )}
@@ -1719,9 +1742,12 @@ export default function App() {
 
                       {Object.values(ledger.items).map((item) => (
                         <View key={item.id} style={styles.tableRow}>
-                          <Text style={[styles.td, {flex: 2}]}>
-                            {item.itemName} {item.status === 'pending_approval' && "⏳"}
-                          </Text>
+                          <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.td}>{item.itemName}</Text>
+                            {item.status === 'pending_approval' && (
+                              <Clock size={12} color={Theme.colors.secondaryText} style={{ marginLeft: 6 }} />
+                            )}
+                          </View>
                           <Text style={[styles.td, {flex: 1, textAlign: 'center'}]}>{item.quantity}</Text>
                           <Text style={[styles.td, {flex: 1, textAlign: 'right'}]}>
                             {item.unitPrice !== null ? `₹${item.unitPrice}` : "-"}
@@ -1732,6 +1758,7 @@ export default function App() {
                           
                           <TouchableOpacity
                             style={styles.editRowBtn}
+                            activeOpacity={0.7}
                             onPress={() => {
                               setEditingEntry({
                                 shopId: shop.id,
@@ -1744,17 +1771,19 @@ export default function App() {
                               setEditModalVisible(true);
                             }}
                           >
-                            <Text>✏️</Text>
+                            <Edit2 size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} />
                           </TouchableOpacity>
                         </View>
                       ))}
                       {ledger.status === 'locked' && (
                         <TouchableOpacity
                           style={styles.generateInvoiceBtn}
+                          activeOpacity={0.7}
                           onPress={() => handleGenerateAndShareInvoice(shop.name, selectedDate)}
                         >
+                          <Share2 size={16} color="#FFFFFF" strokeWidth={1.5} style={{ marginRight: 8 }} />
                           <Text style={styles.generateInvoiceBtnText}>
-                            📤 {t.generateInvoiceBtn}
+                            {t.generateInvoiceBtn}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -1775,9 +1804,16 @@ export default function App() {
               pendingApprovals.map((req) => (
                 <View key={req.id} style={styles.approvalCard}>
                   <View style={styles.approvalHeader}>
-                    <Text style={styles.approvalTypeBadge}>
-                      {req.type === 'delivery' ? "📦 Delivery" : "💰 Payment"}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      {req.type === 'delivery' ? (
+                        <Package size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                      ) : (
+                        <Coins size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                      )}
+                      <Text style={styles.approvalTypeBadge}>
+                        {req.type === 'delivery' ? "Delivery" : "Payment"}
+                      </Text>
+                    </View>
                     <Text style={styles.approvalTime}>
                       {new Date(req.submittedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </Text>
@@ -1786,12 +1822,12 @@ export default function App() {
                   <View style={styles.approvalBody}>
                     {req.type === 'delivery' ? (
                       <Text style={styles.approvalDetails}>
-                        Shop: <Text style={{fontWeight: 'bold'}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
+                        Shop: <Text style={{fontWeight: 'bold', color: Theme.colors.primaryText}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
                         Item: {req.data.itemName} | Qty: {req.data.quantity}
                       </Text>
                     ) : (
                       <Text style={styles.approvalDetails}>
-                        Shop: <Text style={{fontWeight: 'bold'}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
+                        Shop: <Text style={{fontWeight: 'bold', color: Theme.colors.primaryText}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
                         Amount: ₹{req.data.payment.amount}
                       </Text>
                     )}
@@ -1799,16 +1835,20 @@ export default function App() {
 
                   <View style={styles.approvalActions}>
                     <TouchableOpacity
-                      style={[styles.approvalBtn, {backgroundColor: '#2e7d32'}]}
+                      style={[styles.approvalBtn, {backgroundColor: Theme.colors.accent}]}
+                      activeOpacity={0.7}
                       onPress={() => handleApprove(req.id)}
                     >
-                      <Text style={styles.approvalBtnText}>✅ {t.confirmApprove}</Text>
+                      <Check size={14} color="#FFFFFF" strokeWidth={2} style={{ marginRight: 4 }} />
+                      <Text style={styles.approvalBtnText}>{t.confirmApprove}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.approvalBtn, {backgroundColor: '#c62828'}]}
+                      style={[styles.approvalBtn, {backgroundColor: Theme.colors.surfaceElevated, borderWidth: 1, borderColor: Theme.colors.border}]}
+                      activeOpacity={0.7}
                       onPress={() => handleReject(req.id)}
                     >
-                      <Text style={styles.approvalBtnText}>❌ {t.confirmReject}</Text>
+                      <X size={14} color={Theme.colors.secondaryText} strokeWidth={2} style={{ marginRight: 4 }} />
+                      <Text style={[styles.approvalBtnText, {color: Theme.colors.secondaryText}]}>{t.confirmReject}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1825,14 +1865,14 @@ export default function App() {
 
             <View style={styles.settingsGroup}>
               <Text style={styles.settingsLabel}>{t.langLabel}: {language === 'en' ? "English" : "मराठी"}</Text>
-              <TouchableOpacity style={styles.toggleBtnWide} onPress={handleToggleLanguage}>
+              <TouchableOpacity style={styles.toggleBtnWide} activeOpacity={0.7} onPress={handleToggleLanguage}>
                 <Text style={styles.toggleBtnWideText}>{t.toggleLanguage}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.settingsGroup}>
               <Text style={styles.settingsLabel}>{t.roleLabel}: {role === 'admin' ? t.adminRole : t.normalRole}</Text>
-              <TouchableOpacity style={styles.toggleBtnWide} onPress={handleToggleRole}>
+              <TouchableOpacity style={styles.toggleBtnWide} activeOpacity={0.7} onPress={handleToggleRole}>
                 <Text style={styles.toggleBtnWideText}>{t.toggleRole}</Text>
               </TouchableOpacity>
             </View>
@@ -1858,8 +1898,9 @@ export default function App() {
             </View>
 
             {/* Reset data */}
-            <TouchableOpacity style={styles.resetBtn} onPress={handleResetData}>
-              <Text style={styles.resetBtnText}>⚠️ {t.resetData}</Text>
+            <TouchableOpacity style={styles.resetBtn} activeOpacity={0.7} onPress={handleResetData}>
+              <AlertTriangle size={16} color="#FFFFFF" strokeWidth={1.5} style={{ marginRight: 6 }} />
+              <Text style={styles.resetBtnText}>{t.resetData}</Text>
             </TouchableOpacity>
           </ScrollView>
         )}
@@ -1871,15 +1912,18 @@ export default function App() {
           {activeCall.status === "ringing" && (
             <View style={styles.ringingOverlay}>
               <View style={styles.ringingCard}>
-                <Text style={styles.ringingStatusLabel}>📞 {t.incomingCall}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                  <Phone size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+                  <Text style={styles.ringingStatusLabel}>{t.incomingCall}</Text>
+                </View>
                 <Text style={styles.ringingCallerName}>{activeCall.callerName}</Text>
                 <View style={styles.ringingPulsar}></View>
                 
                 <View style={styles.ringingActions}>
-                  <TouchableOpacity style={styles.acceptCallBtn} onPress={handleAcceptCall}>
+                  <TouchableOpacity style={styles.acceptCallBtn} activeOpacity={0.7} onPress={handleAcceptCall}>
                     <Text style={styles.callActionText}>{t.acceptBtn}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.declineCallBtn} onPress={handleDeclineCall}>
+                  <TouchableOpacity style={styles.declineCallBtn} activeOpacity={0.7} onPress={handleDeclineCall}>
                     <Text style={styles.callActionText}>{t.declineBtn}</Text>
                   </TouchableOpacity>
                 </View>
@@ -1891,10 +1935,13 @@ export default function App() {
             <View style={styles.activeCallOverlay}>
               <Text style={styles.activeCallTitle}>{activeCall.callerName}</Text>
               
-              <Text style={styles.activeCallTimer}>
-                ⏱️ {Math.floor(activeCall.duration / 60).toString().padStart(2, '0')}:
-                {(activeCall.duration % 60).toString().padStart(2, '0')}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                <Clock size={16} color={Theme.colors.accent} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                <Text style={styles.activeCallTimer}>
+                  {Math.floor(activeCall.duration / 60).toString().padStart(2, '0')}:
+                  {(activeCall.duration % 60).toString().padStart(2, '0')}
+                </Text>
+              </View>
 
               {/* Voice waveform animation placeholder */}
               <View style={styles.waveformContainer}>
@@ -1906,17 +1953,27 @@ export default function App() {
 
               {/* AI Speech Utterance Box */}
               <View style={styles.callUtteranceBox}>
-                <Text style={styles.callUtteranceText}>🔊 {activeCall.aiUtterance}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <Volume2 size={18} color={Theme.colors.primaryText} strokeWidth={1.5} style={{ marginRight: 8, marginTop: 3 }} />
+                  <Text style={styles.callUtteranceText}>{activeCall.aiUtterance}</Text>
+                </View>
               </View>
 
               {/* Call Status Indicator */}
               <View style={styles.callStatusIndicatorBox}>
-                <Text style={styles.callStatusIndicatorText}>
-                  {callIsListening ? (language === 'mr' ? "🎙️ ऐकत आहे..." : "🎙️ Listening...") : (language === 'mr' ? "🔊 बोलत आहे..." : "🔊 Speaking...")}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  {callIsListening ? (
+                    <Mic size={16} color={Theme.colors.accent} strokeWidth={2} style={{ marginRight: 6 }} />
+                  ) : (
+                    <Volume2 size={16} color={Theme.colors.accent} strokeWidth={2} style={{ marginRight: 6 }} />
+                  )}
+                  <Text style={styles.callStatusIndicatorText}>
+                    {callIsListening ? (language === 'mr' ? "ऐकत आहे..." : "Listening...") : (language === 'mr' ? "बोलत आहे..." : "Speaking...")}
+                  </Text>
+                </View>
               </View>
 
-              <TouchableOpacity style={styles.hangupBtn} onPress={handleEndCall}>
+              <TouchableOpacity style={styles.hangupBtn} activeOpacity={0.7} onPress={handleEndCall}>
                 <Text style={styles.hangupBtnText}>{t.endCallBtn}</Text>
               </TouchableOpacity>
             </View>
@@ -1924,7 +1981,10 @@ export default function App() {
 
           {activeCall.status === "missed" && (
             <View style={styles.missedCallOverlay}>
-              <Text style={styles.missedCallText}>🔴 {t.missedCallAlert}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AlertCircle size={20} color={Theme.colors.mutedText} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                <Text style={styles.missedCallText}>{t.missedCallAlert}</Text>
+              </View>
             </View>
           )}
         </Modal>
