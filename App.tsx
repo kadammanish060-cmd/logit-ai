@@ -40,6 +40,9 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
+  withDelay,
 } from 'react-native-reanimated';
 
 // Translation dictionary
@@ -206,6 +209,45 @@ interface ChatMessage {
   toolExecuted?: string | null;
   toolResult?: any;
 }
+
+const WaveformBar = ({ delay }: { delay: number }) => {
+  const scale = useSharedValue(0.4);
+
+  useEffect(() => {
+    scale.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1.2, { duration: 400 }),
+          withTiming(0.4, { duration: 400 })
+        ),
+        -1,
+        true
+      )
+    );
+  }, [delay]);
+
+  const animStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scaleY: scale.value }],
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: 3,
+          height: 16,
+          backgroundColor: '#3B82F6',
+          borderRadius: 1.5,
+          marginHorizontal: 2,
+        },
+        animStyle,
+      ]}
+    />
+  );
+};
 
 export default function App() {
   // Onboarding Settings
@@ -1479,34 +1521,58 @@ export default function App() {
               {/* Floating Bottom Input Pill */}
               <View style={styles.floatingInputWrapper}>
                 <View style={styles.inputPill}>
-                  <TouchableOpacity style={styles.inputPillAction}>
-                    <Plus size={20} color={Theme.colors.mutedText} strokeWidth={1.5} />
+                  {/* Left: + Button */}
+                  <TouchableOpacity style={styles.inputPillAction} disabled={isListening}>
+                    <Plus size={20} color={isListening ? Theme.colors.mutedText : Theme.colors.secondaryText} strokeWidth={1.5} />
                   </TouchableOpacity>
-                  <TextInput
-                    style={styles.pillTextInput}
-                    value={textCommand}
-                    onChangeText={setTextCommand}
-                    placeholder={isListening ? t.micListening : isProcessing ? t.micProcessing : "Ask Logit AI..."}
-                    placeholderTextColor={Theme.colors.mutedText}
-                    onSubmitEditing={() => {
-                      if (textCommand.trim()) {
-                        submitTextInput(textCommand);
-                      }
-                    }}
-                  />
-                  {textCommand.trim() ? (
+
+                  {/* Center: Listening Indicator vs Text Input */}
+                  {isListening ? (
+                    <View style={styles.listeningContainer}>
+                      <Text style={styles.listeningText}>Listening...</Text>
+                      <View style={styles.inputWaveformContainer}>
+                        <WaveformBar delay={0} />
+                        <WaveformBar delay={100} />
+                        <WaveformBar delay={200} />
+                        <WaveformBar delay={300} />
+                      </View>
+                    </View>
+                  ) : (
+                    <TextInput
+                      style={styles.pillTextInput}
+                      value={textCommand}
+                      onChangeText={setTextCommand}
+                      placeholder="Speak or type..."
+                      placeholderTextColor={Theme.colors.mutedText}
+                      onSubmitEditing={() => {
+                        if (textCommand.trim()) {
+                          submitTextInput(textCommand);
+                        }
+                      }}
+                    />
+                  )}
+
+                  {/* Right: Mic or Circular Blue Send Button */}
+                  {isListening ? (
                     <TouchableOpacity
-                      style={styles.pillSendBtn}
+                      style={styles.pillMicBtnActiveCircular}
+                      onPress={handleMicPress}
+                    >
+                      <Mic size={16} color="#FFFFFF" strokeWidth={2} />
+                    </TouchableOpacity>
+                  ) : textCommand.trim() ? (
+                    <TouchableOpacity
+                      style={styles.pillSendBtnCircular}
                       onPress={() => submitTextInput(textCommand)}
                     >
-                      <Send size={18} color={Theme.colors.accent} strokeWidth={2} />
+                      <Send size={16} color="#FFFFFF" strokeWidth={2.5} />
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      style={[styles.pillMicBtn, isListening && styles.pillMicBtnActive]}
+                      style={styles.pillMicBtnCircular}
                       onPress={handleMicPress}
                     >
-                      <Mic size={18} color={isListening ? Theme.colors.primaryText : Theme.colors.mutedText} strokeWidth={1.5} />
+                      <Mic size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1947,12 +2013,48 @@ const styles = StyleSheet.create({
     padding: Theme.spacing.base,
     backgroundColor: 'transparent',
   },
+  pillSendBtnCircular: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Theme.colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   pillMicBtn: {
     padding: Theme.spacing.base,
     borderRadius: Theme.radius.button,
   },
-  pillMicBtnActive: {
+  pillMicBtnCircular: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillMicBtnActiveCircular: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: Theme.colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listeningContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  listeningText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.accent,
+    fontWeight: '600',
+  },
+  inputWaveformContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: Theme.spacing.sm,
   },
   drawerBackdrop: {
     ...StyleSheet.absoluteFill,
