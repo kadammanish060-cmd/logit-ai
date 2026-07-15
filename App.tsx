@@ -227,6 +227,11 @@ export default function App() {
   const [callIsListening, setCallIsListening] = useState<boolean>(false);
   const isCallLoopActiveRef = useRef<boolean>(false);
   const callListeningSessionRef = useRef<any>(null);
+  const activeCallRef = useRef<CallSession | null>(null);
+
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   // Load database on start
   useEffect(() => {
@@ -569,34 +574,35 @@ export default function App() {
   // Interactive Call voice responder (state machine interface)
   const handleCallVoiceInput = async (spokenText: string) => {
     console.log("[Call Mode] handleCallVoiceInput triggered. Input:", JSON.stringify(spokenText));
-    if (!activeCall || activeCall.status !== "active") {
-      console.log("[Call Mode] Aborting: No active call or call is not in active state.");
+    const currentCall = activeCallRef.current;
+    if (!currentCall || currentCall.status !== "active") {
+      console.log("[Call Mode] Aborting: No active call or call is not in active state. Current ref:", currentCall);
       return;
     }
     
     const query = spokenText.toLowerCase().trim();
     const numbers = query.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
     console.log("[Call Mode] Current call session state:", {
-      type: activeCall.type,
-      status: activeCall.status,
-      duration: activeCall.duration,
-      stepIndex: activeCall.stepIndex,
-      shopIndex: activeCall.shopIndex,
-      itemIndex: activeCall.itemIndex,
-      tempPurchasesLength: activeCall.tempPurchases.length,
+      type: currentCall.type,
+      status: currentCall.status,
+      duration: currentCall.duration,
+      stepIndex: currentCall.stepIndex,
+      shopIndex: currentCall.shopIndex,
+      itemIndex: currentCall.itemIndex,
+      tempPurchasesLength: currentCall.tempPurchases.length,
       parsedQuery: query,
       parsedNumbers: numbers
     });
     
     let nextUtterance = "";
-    let nextStepIndex = activeCall.stepIndex;
-    let nextShopIndex = activeCall.shopIndex;
-    let nextItemIndex = activeCall.itemIndex;
-    let nextTempPurchases = [...activeCall.tempPurchases];
+    let nextStepIndex = currentCall.stepIndex;
+    let nextShopIndex = currentCall.shopIndex;
+    let nextItemIndex = currentCall.itemIndex;
+    let nextTempPurchases = [...currentCall.tempPurchases];
     let isDone = false;
 
     // --- MORNING CALL STATE MACHINE ---
-    if (activeCall.type === "morning") {
+    if (currentCall.type === "morning") {
       console.log("[Call Mode] Processing Morning Call flow...");
       // Step 0: capturing items
       if (nextStepIndex === 0) {
@@ -673,7 +679,7 @@ export default function App() {
     }
     
     // --- NIGHT PRICING CALL STATE MACHINE ---
-    else if (activeCall.type === "night") {
+    else if (currentCall.type === "night") {
       console.log("[Call Mode] Processing Night Pricing Call flow...");
       const unpriced = db.getUnpricedItems(selectedDate);
       const shopsList = Object.keys(unpriced);
