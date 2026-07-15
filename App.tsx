@@ -198,6 +198,12 @@ interface CallSession {
   tempPrices: { shopName: string; itemName: string; price: number }[];
 }
 
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text: string;
+}
+
 export default function App() {
   // Onboarding Settings
   const [hasOnboarded, setHasOnboarded] = useState(false);
@@ -207,6 +213,8 @@ export default function App() {
   // Navigation
   const [currentTab, setCurrentTab] = useState<'home' | 'ledger' | 'approvals' | 'settings'>('home');
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Input states
   const [textCommand, setTextCommand] = useState('');
@@ -326,6 +334,27 @@ export default function App() {
     }
   }, []);
 
+  // --- Chat Screen Effects ---
+  useEffect(() => {
+    setChatMessages([
+      {
+        id: 'welcome',
+        sender: 'assistant',
+        text: language === 'mr' 
+          ? 'नमस्कार! मी तुम्हाला आज कशी मदत करू? तुम्ही खरेदी किंवा व्यवहारांची नोंद येथे करू शकता.'
+          : 'Hello! How can I help you today? You can log purchases or store ledger transactions here.',
+      }
+    ]);
+  }, [language]);
+
+  useEffect(() => {
+    if (scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [chatMessages.length, isProcessing]);
+
   const refreshData = () => {
     setShops(db.getShops());
     setItems(db.getItems());
@@ -397,13 +426,37 @@ export default function App() {
     setAiSpeechOutput('');
     console.log("[Gemini API] submitTextInput. Triggering Gemini NLP for text:", JSON.stringify(inputStr));
 
+    // Append User Message
+    const userMsg: ChatMessage = {
+      id: String(Date.now()),
+      sender: 'user',
+      text: inputStr.trim()
+    };
+    setChatMessages(prev => [...prev, userMsg]);
+
     try {
       const result = await processVoiceInput(inputStr, role, language);
       setAiSpeechOutput(result.responseText);
+      
+      // Append Assistant Message
+      const assistantMsg: ChatMessage = {
+        id: String(Date.now() + 1),
+        sender: 'assistant',
+        text: result.responseText
+      };
+      setChatMessages(prev => [...prev, assistantMsg]);
+
       synthesizeSpeech(result.responseText, language);
       refreshData();
     } catch (e) {
       console.error(e);
+      // Append error notification
+      const errorMsg: ChatMessage = {
+        id: String(Date.now() + 2),
+        sender: 'assistant',
+        text: language === 'mr' ? 'क्षमस्व, विनंतीवर प्रक्रिया करताना त्रुटी आली.' : 'Sorry, an error occurred processing your request.'
+      };
+      setChatMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsProcessing(false);
       setTextCommand('');
@@ -1317,7 +1370,10 @@ export default function App() {
         <View style={styles.content}>
           {currentTab === 'home' && (
             <View style={styles.homeTabContainer}>
-              <ScrollView contentContainerStyle={[styles.tabContent, { paddingBottom: 100 }]}>
+              <ScrollView
+                ref={scrollViewRef}
+                contentContainerStyle={[styles.tabContent, { paddingBottom: 140 }]}
+              >
                 {/* Simulated Scheduler & Time warp widget */}
                 <View style={styles.simulatedTimeWidget}>
                   <View style={styles.simTimeHeader}>
@@ -1355,21 +1411,41 @@ export default function App() {
                   )}
                 </View>
 
-                {/* Dynamic AI Status box */}
-                <View style={styles.aiStatusBox}>
-                  <Text style={styles.voicePromptText}>
-                    {isListening ? t.micListening : isProcessing ? t.micProcessing : t.micTapToSpeak}
-                  </Text>
-                  
-                  {recognizedText ? (
-                    <Text style={styles.recognizedText}>" {recognizedText} "</Text>
-                  ) : null}
+                {/* Chat Messages */}
+                <View style={styles.chatContainer}>
+                  {chatMessages.map((msg) => {
+                    const isUser = msg.sender === 'user';
+                    return (
+                      <View
+                        key={msg.id}
+                        style={[
+                          styles.chatMessageRow,
+                          isUser ? styles.chatRowUser : styles.chatRowAssistant
+                        ]}
+                      >
+                        {isUser ? (
+                          <View style={styles.userMessagePill}>
+                            <Text style={styles.userMessageText}>{msg.text}</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.assistantMessageContainer}>
+                            <Text style={styles.assistantMessageText}>{msg.text}</Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
 
-                  {aiSpeechOutput ? (
-                    <View style={styles.speechBubble}>
-                      <Text style={styles.aiSpeechText}>🔊 {aiSpeechOutput}</Text>
+                  {/* Typing Indicator */}
+                  {isProcessing && (
+                    <View style={styles.chatRowAssistant}>
+                      <View style={styles.assistantMessageContainer}>
+                        <Text style={styles.typingIndicatorText}>
+                          {language === 'mr' ? 'प्रक्रिया करत आहे...' : 'Logit AI is typing...'}
+                        </Text>
+                      </View>
                     </View>
-                  ) : null}
+                  )}
                 </View>
 
                 {/* Controls */}
@@ -1399,7 +1475,7 @@ export default function App() {
                     style={styles.pillTextInput}
                     value={textCommand}
                     onChangeText={setTextCommand}
-                    placeholder="Ask Logit AI..."
+                    placeholder={isListening ? t.micListening : isProcessing ? t.micProcessing : "Ask Logit AI..."}
                     placeholderTextColor={Theme.colors.mutedText}
                     onSubmitEditing={() => {
                       if (textCommand.trim()) {
@@ -2182,41 +2258,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  aiStatusBox: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e8eaf6',
-    alignItems: 'center',
-  },
-  voicePromptText: {
-    fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  recognizedText: {
-    fontSize: 16,
-    fontStyle: 'italic',
-    color: '#283593',
-    textAlign: 'center',
-    marginBottom: 12,
-    fontWeight: '500',
-  },
-  speechBubble: {
-    backgroundColor: '#e8eaf6',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 8,
+  chatContainer: {
+    paddingVertical: Theme.spacing.md,
     width: '100%',
   },
-  aiSpeechText: {
-    fontSize: 15,
-    color: '#1a237e',
+  chatMessageRow: {
+    marginVertical: Theme.spacing.md,
+    width: '100%',
+  },
+  chatRowUser: {
+    alignItems: 'flex-end',
+  },
+  chatRowAssistant: {
+    alignItems: 'flex-start',
+  },
+  userMessagePill: {
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    maxWidth: '90%',
+  },
+  userMessageText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
+    lineHeight: 20,
+  },
+  assistantMessageContainer: {
+    maxWidth: '90%',
+    paddingHorizontal: Theme.spacing.xs,
+  },
+  assistantMessageText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
     lineHeight: 22,
+  },
+  typingIndicatorText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.mutedText,
+    fontStyle: 'italic',
   },
   voiceControlsContainer: {
     justifyContent: 'center',
