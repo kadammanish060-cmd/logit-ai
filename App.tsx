@@ -35,6 +35,10 @@ import {
   History,
   Info,
   PlusCircle,
+  Camera,
+  Image as ImageIcon,
+  FileText,
+  Grid,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -356,6 +360,28 @@ export default function App() {
       refreshData();
     }, 200);
   };
+
+  // --- Attachment Picker States & Animations ---
+  const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
+  const attachmentMenuScale = useSharedValue(0.8);
+  const attachmentMenuOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (isAttachmentMenuOpen) {
+      attachmentMenuScale.value = withTiming(1, { duration: 150 });
+      attachmentMenuOpacity.value = withTiming(1, { duration: 150 });
+    } else {
+      attachmentMenuScale.value = withTiming(0.8, { duration: 120 });
+      attachmentMenuOpacity.value = withTiming(0, { duration: 120 });
+    }
+  }, [isAttachmentMenuOpen]);
+
+  const animatedPopupStyle = useAnimatedStyle(() => {
+    return {
+      opacity: attachmentMenuOpacity.value,
+      transform: [{ scale: attachmentMenuScale.value }],
+    };
+  });
 
   // Load database on start
   useEffect(() => {
@@ -1518,11 +1544,72 @@ export default function App() {
                 </TouchableOpacity>
               </ScrollView>
 
+              {/* Backdrop capture for attachment menu */}
+              {isAttachmentMenuOpen && (
+                <Pressable
+                  style={StyleSheet.absoluteFill}
+                  onPress={() => setIsAttachmentMenuOpen(false)}
+                />
+              )}
+
+              {/* Anchored Attachment Popup Menu */}
+              {isAttachmentMenuOpen && (
+                <Animated.View style={[styles.attachmentPopup, animatedPopupStyle]}>
+                  <TouchableOpacity
+                    style={styles.attachmentItem}
+                    onPress={() => {
+                      setIsAttachmentMenuOpen(false);
+                      Alert.alert('Camera', 'Accessing camera...');
+                    }}
+                  >
+                    <Camera size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <Text style={styles.attachmentItemText}>Camera</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentItem}
+                    onPress={() => {
+                      setIsAttachmentMenuOpen(false);
+                      Alert.alert('Photos', 'Opening photo library...');
+                    }}
+                  >
+                    <ImageIcon size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <Text style={styles.attachmentItemText}>Photos</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentItem}
+                    onPress={() => {
+                      setIsAttachmentMenuOpen(false);
+                      Alert.alert('Files', 'Opening document explorer...');
+                    }}
+                  >
+                    <FileText size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <Text style={styles.attachmentItemText}>Files</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentItem}
+                    onPress={() => {
+                      setIsAttachmentMenuOpen(false);
+                      Alert.alert('Plugins', 'Opening plugins store...');
+                    }}
+                  >
+                    <Grid size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <Text style={styles.attachmentItemText}>Plugins</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+
               {/* Floating Bottom Input Pill */}
               <View style={styles.floatingInputWrapper}>
                 <View style={styles.inputPill}>
                   {/* Left: + Button */}
-                  <TouchableOpacity style={styles.inputPillAction} disabled={isListening}>
+                  <TouchableOpacity
+                    style={styles.inputPillAction}
+                    disabled={isListening}
+                    onPress={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
+                  >
                     <Plus size={20} color={isListening ? Theme.colors.mutedText : Theme.colors.secondaryText} strokeWidth={1.5} />
                   </TouchableOpacity>
 
@@ -1980,12 +2067,43 @@ const styles = StyleSheet.create({
     position: 'relative',
     backgroundColor: Theme.colors.background,
   },
+  attachmentPopup: {
+    position: 'absolute',
+    bottom: 72,
+    left: Theme.spacing.marginMobile,
+    width: 200,
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: 24,
+    padding: Theme.spacing.sm,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 100,
+  },
+  attachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.base,
+    paddingHorizontal: Theme.spacing.base,
+    borderRadius: 16,
+  },
+  attachmentItemText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
+    marginLeft: Theme.spacing.md,
+    fontWeight: '500',
+  },
   floatingInputWrapper: {
     position: 'absolute',
     bottom: Theme.spacing.md,
     left: Theme.spacing.marginMobile,
     right: Theme.spacing.marginMobile,
     alignItems: 'center',
+    zIndex: 99,
   },
   inputPill: {
     flexDirection: 'row',
