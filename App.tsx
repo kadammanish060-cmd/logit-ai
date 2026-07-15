@@ -18,6 +18,7 @@ import * as db from './services/db';
 import { processVoiceInput } from './services/gemini';
 import { startContinuousListening, synthesizeSpeech } from './services/voice';
 import { Theme } from './styles/theme';
+import { BusinessCardDispatcher } from './components/BusinessCards';
 import {
   Menu as MenuIcon,
   Phone,
@@ -202,6 +203,8 @@ interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
+  toolExecuted?: string | null;
+  toolResult?: any;
 }
 
 export default function App() {
@@ -1430,6 +1433,14 @@ export default function App() {
                         ) : (
                           <View style={styles.assistantMessageContainer}>
                             <Text style={styles.assistantMessageText}>{msg.text}</Text>
+                            {msg.toolExecuted && msg.toolResult && (
+                              <View style={{ marginTop: Theme.spacing.sm }}>
+                                <BusinessCardDispatcher
+                                  toolExecuted={msg.toolExecuted}
+                                  toolResult={msg.toolResult}
+                                />
+                              </View>
+                            )}
                           </View>
                         )}
                       </View>
