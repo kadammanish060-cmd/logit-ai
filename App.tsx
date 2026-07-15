@@ -51,6 +51,9 @@ import {
   Clock,
   Volume2,
   AlertCircle,
+  ShieldAlert,
+  User,
+  ArrowRight,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -1265,12 +1268,14 @@ export default function App() {
           <View style={styles.row}>
             <TouchableOpacity
               style={[styles.toggleBtn, language === 'en' && styles.activeBtn]}
+              activeOpacity={0.7}
               onPress={() => setLanguage('en')}
             >
               <Text style={styles.btnText}>English</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleBtn, language === 'mr' && styles.activeBtn]}
+              activeOpacity={0.7}
               onPress={() => setLanguage('mr')}
             >
               <Text style={styles.btnText}>मराठी (Marathi)</Text>
@@ -1280,20 +1285,31 @@ export default function App() {
           <Text style={styles.labelSection}>{t.selectRole}</Text>
           <TouchableOpacity
             style={[styles.roleSelectCard, role === 'admin' && styles.activeRoleCard]}
+            activeOpacity={0.7}
             onPress={() => setRole('admin')}
           >
-            <Text style={styles.roleCardText}>👩‍💼 {t.adminRole}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ShieldAlert size={18} color={role === 'admin' ? '#FFFFFF' : Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+              <Text style={styles.roleCardText}>{t.adminRole}</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.roleSelectCard, role === 'normal' && styles.activeRoleCard]}
+            activeOpacity={0.7}
             onPress={() => setRole('normal')}
           >
-            <Text style={styles.roleCardText}>🧔 {t.normalRole}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <User size={18} color={role === 'normal' ? '#FFFFFF' : Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+              <Text style={styles.roleCardText}>{t.normalRole}</Text>
+            </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.startBtn} onPress={handleStartOnboarding}>
-            <Text style={styles.startBtnText}>{t.startBtn} 🚀</Text>
+          <TouchableOpacity style={styles.startBtn} activeOpacity={0.7} onPress={handleStartOnboarding}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={styles.startBtnText}>{t.startBtn}</Text>
+              <ArrowRight size={16} color="#FFFFFF" strokeWidth={2} style={{ marginLeft: 8 }} />
+            </View>
           </TouchableOpacity>
         </View>
         <StatusBar style="light" />
@@ -1316,13 +1332,13 @@ export default function App() {
         <Animated.View style={[styles.drawerPanel, animatedDrawerStyle]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.drawerTitle}>Logit AI</Text>
-            <TouchableOpacity style={styles.drawerCloseBtn} onPress={handleCloseDrawer}>
+            <TouchableOpacity style={styles.drawerCloseBtn} activeOpacity={0.7} onPress={handleCloseDrawer}>
               <X size={22} color={Theme.colors.primaryText} strokeWidth={1.5} />
             </TouchableOpacity>
           </View>
 
           {/* New Chat Button */}
-          <TouchableOpacity style={styles.newChatBtn} onPress={() => handleNavPress('home')}>
+          <TouchableOpacity style={styles.newChatBtn} activeOpacity={0.7} onPress={() => handleNavPress('home')}>
             <Text style={styles.newChatBtnText}>New Chat</Text>
             <Plus size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
           </TouchableOpacity>
@@ -1331,6 +1347,7 @@ export default function App() {
             {/* History Section */}
             <TouchableOpacity
               style={[styles.drawerNavItem, currentTab === 'home' && styles.drawerNavItemActive]}
+              activeOpacity={0.7}
               onPress={() => handleNavPress('home')}
             >
               <MessageSquare size={18} color={currentTab === 'home' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
@@ -1339,6 +1356,7 @@ export default function App() {
 
             <TouchableOpacity
               style={styles.drawerNavItem}
+              activeOpacity={0.7}
               onPress={() => {
                 handleCloseDrawer();
                 Alert.alert(
@@ -1366,6 +1384,7 @@ export default function App() {
                     styles.drawerShopCard,
                     isSelected && styles.drawerShopCardSelected
                   ]}
+                  activeOpacity={0.7}
                   onPress={() => {
                     setSelectedShopId(shop.id);
                     handleNavPress('ledger');
@@ -1390,6 +1409,7 @@ export default function App() {
           <View style={styles.drawerFooter}>
             <TouchableOpacity
               style={styles.drawerFooterLink}
+              activeOpacity={0.7}
               onPress={() => {
                 setSelectedShopId(null);
                 handleNavPress('settings');
@@ -1402,6 +1422,7 @@ export default function App() {
             {role === 'admin' && (
               <TouchableOpacity
                 style={styles.drawerFooterLink}
+                activeOpacity={0.7}
                 onPress={() => handleNavPress('approvals')}
               >
                 <CheckSquare size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
@@ -1411,6 +1432,7 @@ export default function App() {
 
             <TouchableOpacity
               style={styles.drawerFooterLink}
+              activeOpacity={0.7}
               onPress={() => handleNavPress('settings')}
             >
               <SettingsIcon size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
@@ -1419,6 +1441,7 @@ export default function App() {
 
             <TouchableOpacity
               style={styles.drawerFooterLink}
+              activeOpacity={0.7}
               onPress={() => {
                 Alert.alert(
                   'About Logit AI',
@@ -1441,11 +1464,11 @@ export default function App() {
       <View style={styles.container}>
         {/* Top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.topBarButton} onPress={() => setIsDrawerOpen(true)}>
+          <TouchableOpacity style={styles.topBarButton} activeOpacity={0.7} onPress={() => setIsDrawerOpen(true)}>
             <MenuIcon size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>Logit AI</Text>
-          <TouchableOpacity style={styles.topBarButton} onPress={() => initiateRinging("on_demand")}>
+          <TouchableOpacity style={styles.topBarButton} activeOpacity={0.7} onPress={() => initiateRinging("on_demand")}>
             <Phone size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
           </TouchableOpacity>
         </View>
@@ -2371,83 +2394,90 @@ const styles = StyleSheet.create({
   },
   onboardContainer: {
     flex: 1,
-    backgroundColor: '#1a237e',
+    backgroundColor: Theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   onboardCard: {
     width: '90%',
     maxWidth: 450,
-    backgroundColor: '#white',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: Theme.colors.surface,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.md,
+    shadowColor: '#000000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
   onboardTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a237e',
+    ...Theme.typography.displayLg,
+    fontSize: 28,
+    color: Theme.colors.primaryText,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: Theme.spacing.md,
   },
   labelSection: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#555',
-    marginTop: 16,
-    marginBottom: 8,
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.secondaryText,
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.base,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    marginVertical: Theme.spacing.xs,
   },
   toggleBtn: {
     flex: 1,
-    backgroundColor: '#eee',
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginHorizontal: 4,
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderRadius: Theme.radius.button,
+    paddingVertical: Theme.spacing.base,
+    marginHorizontal: Theme.spacing.xs,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
   activeBtn: {
-    backgroundColor: '#283593',
+    backgroundColor: Theme.colors.accent,
+    borderColor: Theme.colors.accent,
   },
   btnText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   roleSelectCard: {
-    backgroundColor: '#eee',
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.md,
+    marginVertical: Theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
   activeRoleCard: {
-    borderColor: '#283593',
-    backgroundColor: '#e8eaf6',
+    borderColor: Theme.colors.accent,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
   },
   roleCardText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
   },
   startBtn: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 16,
-    paddingVertical: 16,
-    marginTop: 32,
+    backgroundColor: Theme.colors.accent,
+    borderRadius: Theme.radius.button,
+    paddingVertical: Theme.spacing.base,
+    marginTop: Theme.spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   startBtnText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -2661,151 +2691,146 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1a237e',
-    marginBottom: 20,
+    ...Theme.typography.bodyLg,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
+    marginBottom: Theme.spacing.md,
   },
   dateSelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    marginBottom: Theme.spacing.md,
   },
   dateLabel: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#555',
-    marginRight: 10,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.secondaryText,
+    marginRight: Theme.spacing.base,
   },
   dateInput: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1a237e',
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
+    backgroundColor: Theme.colors.surface,
+    borderColor: Theme.colors.border,
+    borderWidth: 1,
+    borderRadius: Theme.radius.button,
+    paddingHorizontal: Theme.spacing.base,
+    paddingVertical: Theme.spacing.xs,
   },
   ledgerShopCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
     borderWidth: 1,
-    borderColor: '#e8eaf6',
+    borderColor: Theme.colors.border,
   },
   ledgerShopHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    paddingBottom: 10,
-    marginBottom: 10,
+    borderBottomColor: Theme.colors.border,
+    paddingBottom: Theme.spacing.base,
+    marginBottom: Theme.spacing.base,
   },
   ledgerShopName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
   },
   ledgerShopBalance: {
-    backgroundColor: '#fff3e0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    paddingHorizontal: Theme.spacing.base,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.radius.button,
   },
   balanceText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#e65100',
+    ...Theme.typography.labelSm,
+    fontWeight: '600',
+    color: Theme.colors.accent,
   },
   ledgerStatusIndicator: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: Theme.spacing.base,
   },
   statusBadge: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#555',
+    ...Theme.typography.labelSm,
+    color: Theme.colors.secondaryText,
   },
   totalBillText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#2e7d32',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.accent,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f5f7fb',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 6,
+    backgroundColor: Theme.colors.surfaceElevated,
+    paddingVertical: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.base,
+    borderRadius: 12,
   },
   th: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#757575',
+    ...Theme.typography.labelSm,
+    color: Theme.colors.secondaryText,
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: Theme.spacing.base,
+    paddingHorizontal: Theme.spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Theme.colors.border,
     alignItems: 'center',
   },
   td: {
-    fontSize: 13,
-    color: '#333',
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
   },
   editRowBtn: {
-    flex: 1,
-    alignItems: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surfaceElevated,
   },
   emptyText: {
-    fontSize: 13,
-    color: '#9e9e9e',
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.mutedText,
     textAlign: 'center',
-    marginVertical: 12,
+    marginVertical: Theme.spacing.md,
   },
   approvalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.base,
     borderWidth: 1,
-    borderColor: '#e8eaf6',
+    borderColor: Theme.colors.border,
   },
   approvalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: Theme.spacing.base,
   },
   approvalTypeBadge: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#1a237e',
-    backgroundColor: '#e8eaf6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    ...Theme.typography.labelSm,
+    color: Theme.colors.primaryText,
   },
   approvalTime: {
-    fontSize: 11,
-    color: '#757575',
+    ...Theme.typography.labelSm,
+    color: Theme.colors.mutedText,
   },
   approvalBody: {
-    marginBottom: 16,
+    marginBottom: Theme.spacing.base,
   },
   approvalDetails: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.secondaryText,
+    lineHeight: 22,
   },
   approvalActions: {
     flexDirection: 'row',
@@ -2813,135 +2838,153 @@ const styles = StyleSheet.create({
   },
   approvalBtn: {
     flex: 1,
-    paddingVertical: 12,
-    marginHorizontal: 4,
-    borderRadius: 10,
+    paddingVertical: Theme.spacing.base,
+    marginHorizontal: Theme.spacing.xs,
+    borderRadius: Theme.radius.button,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   approvalBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 13,
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   settingsGroup: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: Theme.colors.surface,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.md,
+    marginBottom: Theme.spacing.base,
     borderWidth: 1,
-    borderColor: '#e8eaf6',
+    borderColor: Theme.colors.border,
   },
   settingsLabel: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
+    marginBottom: Theme.spacing.base,
   },
   toggleBtnWide: {
-    backgroundColor: '#e8eaf6',
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderRadius: Theme.radius.button,
+    paddingVertical: Theme.spacing.base,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
   toggleBtnWideText: {
-    color: '#283593',
-    fontWeight: 'bold',
+    ...Theme.typography.bodyMd,
+    fontWeight: '500',
+    color: Theme.colors.primaryText,
   },
   listItem: {
-    fontSize: 13,
-    color: '#555',
-    marginVertical: 4,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.secondaryText,
+    marginVertical: Theme.spacing.xs,
   },
   itemsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   itemTag: {
-    backgroundColor: '#f5f7fb',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    margin: 4,
+    backgroundColor: Theme.colors.surfaceElevated,
+    paddingHorizontal: Theme.spacing.base,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.radius.button,
+    margin: Theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
   },
   itemTagText: {
-    fontSize: 12,
-    color: '#333',
+    ...Theme.typography.labelSm,
+    color: Theme.colors.primaryText,
     fontWeight: '500',
   },
   resetBtn: {
-    borderColor: '#c62828',
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderColor: Theme.colors.border,
+    borderWidth: 1,
+    borderRadius: Theme.radius.button,
+    paddingVertical: Theme.spacing.base,
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.lg,
+    backgroundColor: Theme.colors.surface,
   },
   resetBtnText: {
-    color: '#c62828',
-    fontWeight: 'bold',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
   },
   generateInvoiceBtn: {
-    backgroundColor: '#1b4332',
-    borderRadius: 10,
-    paddingVertical: 12,
-    marginTop: 15,
+    backgroundColor: Theme.colors.accent,
+    borderRadius: Theme.radius.button,
+    paddingVertical: Theme.spacing.base,
+    marginTop: Theme.spacing.base,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   generateInvoiceBtnText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 14,
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '90%',
     maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: Theme.colors.surface,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.md,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a237e',
-    marginBottom: 16,
+    ...Theme.typography.bodyLg,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
+    marginBottom: Theme.spacing.base,
     textAlign: 'center',
   },
   modalLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#555',
-    marginTop: 10,
-    marginBottom: 4,
+    ...Theme.typography.labelSm,
+    color: Theme.colors.secondaryText,
+    marginTop: Theme.spacing.base,
+    marginBottom: Theme.spacing.xs,
   },
   modalInput: {
-    backgroundColor: '#f5f7fb',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
-    color: '#333',
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.button,
+    paddingHorizontal: Theme.spacing.base,
+    paddingVertical: Theme.spacing.base,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    marginTop: Theme.spacing.md,
   },
   modalBtn: {
     flex: 1,
-    paddingVertical: 12,
-    marginHorizontal: 6,
-    borderRadius: 8,
+    paddingVertical: Theme.spacing.base,
+    marginHorizontal: Theme.spacing.xs,
+    borderRadius: Theme.radius.button,
     alignItems: 'center',
   },
   modalBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   navigation: {
     flexDirection: 'row',
