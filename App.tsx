@@ -224,6 +224,9 @@ export default function App() {
   const callTimerRef = useRef<any>(null);
   const ringingTimeoutRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
+  const [callIsListening, setCallIsListening] = useState<boolean>(false);
+  const isCallLoopActiveRef = useRef<boolean>(false);
+  const callListeningSessionRef = useRef<any>(null);
 
   // Load database on start
   useEffect(() => {
@@ -449,12 +452,13 @@ export default function App() {
   };
 
   // Ringing accepted -> active call
-  const handleAcceptCall = () => {
+  const handleAcceptCall = async () => {
     if (!activeCall) return;
     
     // Clear ringing timeout
     if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
 
+    isCallLoopActiveRef.current = true;
     const activeSession: CallSession = {
       ...activeCall,
       status: "active"
@@ -462,9 +466,6 @@ export default function App() {
 
     setActiveCall(activeSession);
     
-    // Synthesize initial greeting speech
-    synthesizeSpeech(activeSession.aiUtterance, language);
-
     // Start timer incrementer
     callTimerRef.current = setInterval(() => {
       setActiveCall(curr => {
@@ -474,10 +475,29 @@ export default function App() {
         return curr;
       });
     }, 1000);
+
+    try {
+      console.log("[Call Loop] Speaking initial greeting:", JSON.stringify(activeSession.aiUtterance));
+      await synthesizeSpeech(activeSession.aiUtterance, language);
+      console.log("[Call Loop] Initial greeting finished playing.");
+      
+      // Start the voice-only call loop
+      runCallVoiceListening();
+    } catch (err) {
+      console.error("[Call Loop] Initial greeting synthesize error:", err);
+      runCallVoiceListening();
+    }
   };
 
   // End active call
   const handleEndCall = () => {
+    isCallLoopActiveRef.current = false;
+    setCallIsListening(false);
+    if (callListeningSessionRef.current) {
+      console.log("[Call Loop] Stopping call recording on hangup...");
+      callListeningSessionRef.current.stop();
+      callListeningSessionRef.current = null;
+    }
     if (callTimerRef.current) clearInterval(callTimerRef.current);
     if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
     
@@ -487,6 +507,59 @@ export default function App() {
 
     setActiveCall(null);
     refreshData();
+  };
+
+  const runCallVoiceListening = async () => {
+    if (!isCallLoopActiveRef.current) {
+      console.log("[Call Loop] Listening loop aborted (call ended).");
+      return;
+    }
+    
+    console.log("[Call Loop] Starting user voice recording...");
+    setCallIsListening(true);
+    
+    const transcriptionPromise = new Promise<string>((resolve, reject) => {
+      const session = startContinuousListening(
+        (transcript) => resolve(transcript),
+        (err) => reject(err),
+        language
+      );
+      callListeningSessionRef.current = session;
+    });
+
+    // Record for 7 seconds per turn
+    const timeoutId = setTimeout(() => {
+      console.log("[Call Loop] 7s silence/speaking limit reached. Stopping recorder...");
+      if (callListeningSessionRef.current) {
+        callListeningSessionRef.current.stop();
+        callListeningSessionRef.current = null;
+      }
+    }, 7000);
+
+    try {
+      const transcript = await transcriptionPromise;
+      clearTimeout(timeoutId);
+      setCallIsListening(false);
+      
+      console.log("[Call Loop] User voice transcribed:", JSON.stringify(transcript));
+      if (!isCallLoopActiveRef.current) return;
+      
+      // Feed to the state machine
+      await handleCallVoiceInput(transcript);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      setCallIsListening(false);
+      console.error("[Call Loop] Recording/STT error:", err);
+      
+      if (isCallLoopActiveRef.current) {
+        // Speak fallback prompt to keep call alive
+        const prompt = language === "mr" 
+          ? "कृपया पुन्हा सांगा." 
+          : "Please repeat that.";
+        await synthesizeSpeech(prompt, language);
+        runCallVoiceListening();
+      }
+    }
   };
 
   // Interactive Call voice responder (state machine interface)
@@ -717,13 +790,22 @@ export default function App() {
       return curr;
     });
 
-    synthesizeSpeech(nextUtterance, language);
+    try {
+      console.log("[Call Loop] AI speaking reply:", JSON.stringify(nextUtterance));
+      await synthesizeSpeech(nextUtterance, language);
+      console.log("[Call Loop] AI reply playback completed.");
+    } catch (err) {
+      console.error("[Call Loop] AI reply synthesize error:", err);
+    }
 
     if (isDone) {
       console.log("[Call Mode] Scheduled call hangup in 5 seconds...");
       setTimeout(() => {
         handleEndCall();
       }, 5000);
+    } else {
+      // Loop: Start listening again
+      runCallVoiceListening();
     }
   };
 
@@ -1348,37 +1430,11 @@ export default function App() {
                 <Text style={styles.callUtteranceText}>🔊 {activeCall.aiUtterance}</Text>
               </View>
 
-              {/* User Speech input for typing/submitting in emulator */}
-              <View style={styles.callInputRow}>
-                <TextInput
-                  style={styles.callTextInput}
-                  value={textCommand}
-                  onChangeText={setTextCommand}
-                  placeholder={language === 'mr' ? "इथे बोला..." : "Speak/type here..."}
-                  onSubmitEditing={() => {
-                    handleCallVoiceInput(textCommand);
-                    setTextCommand('');
-                  }}
-                />
-                <TouchableOpacity
-                  style={styles.callSendBtn}
-                  onPress={() => {
-                    handleCallVoiceInput(textCommand);
-                    setTextCommand('');
-                  }}
-                >
-                  <Text style={styles.callSendBtnText}>➡️</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick response helpers for testing call flows */}
-              <View style={styles.quickCallAnswersRow}>
-                <TouchableOpacity style={styles.quickAnswerBtn} onPress={() => handleCallVoiceInput("done")}>
-                  <Text style={styles.quickAnswerBtnText}>{t.callDoneBtn}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAnswerBtn} onPress={() => handleCallVoiceInput("yes")}>
-                  <Text style={styles.quickAnswerBtnText}>{t.callYesBtn}</Text>
-                </TouchableOpacity>
+              {/* Call Status Indicator */}
+              <View style={styles.callStatusIndicatorBox}>
+                <Text style={styles.callStatusIndicatorText}>
+                  {callIsListening ? (language === 'mr' ? "🎙️ ऐकत आहे..." : "🎙️ Listening...") : (language === 'mr' ? "🔊 बोलत आहे..." : "🔊 Speaking...")}
+                </Text>
               </View>
 
               <TouchableOpacity style={styles.hangupBtn} onPress={handleEndCall}>
@@ -2288,6 +2344,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  callStatusIndicatorBox: {
+    marginTop: 20,
+    marginBottom: 40,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  callStatusIndicatorText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   missedCallOverlay: {
     flex: 1,

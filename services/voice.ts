@@ -1,4 +1,4 @@
-import { createAudioPlayer, AudioModule, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { createAudioPlayer, AudioModule, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EncodingType } from 'expo-file-system';
@@ -252,7 +252,13 @@ export function startContinuousListening(
         });
         console.log("[Sarvam AI] Audio session configured for recording.");
 
-        const recorder = new AudioModule.AudioRecorder({});
+        const recorder = new AudioModule.AudioRecorder({
+          ...RecordingPresets.HIGH_QUALITY,
+          android: {
+            ...RecordingPresets.HIGH_QUALITY.android,
+            audioSource: 'voice_communication'
+          }
+        });
         recorderInstance = recorder;
 
         console.log("[Sarvam AI] Preparing AudioRecorder...");
