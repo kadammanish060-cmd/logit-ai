@@ -310,15 +310,6 @@ export default function App() {
     );
 
     recognitionRef.current = recognition;
-
-    setTimeout(() => {
-      if (recognitionRef.current) {
-        console.log("[UI] 6s recording limit reached. Stopping automatically...");
-        setIsListening(false);
-        recognitionRef.current.stop();
-        recognitionRef.current = null;
-      }
-    }, 6000);
   };
 
   const submitTextInput = async (inputStr: string) => {
@@ -500,10 +491,25 @@ export default function App() {
 
   // Interactive Call voice responder (state machine interface)
   const handleCallVoiceInput = async (spokenText: string) => {
-    if (!activeCall || activeCall.status !== "active") return;
+    console.log("[Call Mode] handleCallVoiceInput triggered. Input:", JSON.stringify(spokenText));
+    if (!activeCall || activeCall.status !== "active") {
+      console.log("[Call Mode] Aborting: No active call or call is not in active state.");
+      return;
+    }
     
     const query = spokenText.toLowerCase().trim();
     const numbers = query.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+    console.log("[Call Mode] Current call session state:", {
+      type: activeCall.type,
+      status: activeCall.status,
+      duration: activeCall.duration,
+      stepIndex: activeCall.stepIndex,
+      shopIndex: activeCall.shopIndex,
+      itemIndex: activeCall.itemIndex,
+      tempPurchasesLength: activeCall.tempPurchases.length,
+      parsedQuery: query,
+      parsedNumbers: numbers
+    });
     
     let nextUtterance = "";
     let nextStepIndex = activeCall.stepIndex;
@@ -514,19 +520,23 @@ export default function App() {
 
     // --- MORNING CALL STATE MACHINE ---
     if (activeCall.type === "morning") {
+      console.log("[Call Mode] Processing Morning Call flow...");
       // Step 0: capturing items
       if (nextStepIndex === 0) {
         const isDoneCommand = query.includes("done") || query.includes("that's all") || 
                              query.includes("संपले") || query.includes("झालं");
         
         if (isDoneCommand) {
+          console.log("[Call Mode] 'Done' command matched.");
           // Move to confirmation step
           if (nextTempPurchases.length === 0) {
+            console.log("[Call Mode] Warning: No purchases recorded. Remaining on step 0.");
             nextUtterance = language === "mr"
               ? "तुम्ही कोणतीही खरेदी नोंदवली नाही. खरेदी नोंदवायची आहे का?"
               : "You haven't logged any purchases yet. Would you like to log one?";
           } else {
             const summaryStr = nextTempPurchases.map(p => `${p.quantity} ${p.itemName}`).join(", ");
+            console.log("[Call Mode] Moving to Step 1 (Confirmation) with purchases:", summaryStr);
             nextUtterance = language === "mr"
               ? `तुमची आजची एकूण खरेदी: ${summaryStr}. हे बरोबर आहे का? 'होय' किंवा 'नाही' म्हणा.`
               : `Confirming today's purchases: ${summaryStr}. Is this correct? Say 'yes' or 'no'.`;
@@ -535,10 +545,12 @@ export default function App() {
         } else {
           // Extract item and numbers
           const matchedItem = items.find(i => query.includes(i.name.toLowerCase()) || i.aliases.some(a => query.includes(a.toLowerCase())));
+          console.log("[Call Mode] Item matching attempt:", matchedItem ? matchedItem.name : "none");
           
           if (matchedItem && numbers.length >= 2) {
             const qty = numbers[0];
             const price = numbers[1];
+            console.log("[Call Mode] Successfully extracted purchase parameters:", { item: matchedItem.name, qty, price });
             
             nextTempPurchases.push({
               itemName: matchedItem.name,
@@ -550,6 +562,7 @@ export default function App() {
               ? `नोंद केली: ${qty} ${matchedItem.name} ₹${price} मध्ये. पुढे सांगा किंवा 'संपले' म्हणा.`
               : `Recorded ${qty} units of ${matchedItem.name} for ₹${price}. Anything else?`;
           } else {
+            console.log("[Call Mode] Failed to parse item, quantity, and price. Prompting format help.");
             nextUtterance = language === "mr"
               ? "कृपया वस्तूचे नाव, वजन (संख्या) आणि किंमत सांगा. उदाहरणार्थ: '१० बटाटे शंभर रुपये'."
               : "Please specify the item name, quantity, and total price paid. E.g. '10 potato for 100 rupees'.";
@@ -558,9 +571,12 @@ export default function App() {
       } 
       // Step 1: Confirmation
       else if (nextStepIndex === 1) {
+        console.log("[Call Mode] Confirmation step processing query:", query);
         if (query.includes("yes") || query.includes("हो") || query.includes("बरोबर")) {
+          console.log("[Call Mode] Save confirmed. Committing purchases to business ledger database:");
           // Save all purchases to database
           nextTempPurchases.forEach(p => {
+            console.log(` -> Logging: ${p.quantity} units of ${p.itemName} (Paid: ₹${p.pricePaid})`);
             db.logPurchase(selectedDate, p.itemName, p.quantity, p.pricePaid);
           });
           nextUtterance = language === "mr"
@@ -568,6 +584,7 @@ export default function App() {
             : "All purchases have been saved successfully. Thank you, goodbye!";
           isDone = true;
         } else {
+          console.log("[Call Mode] Save declined. Resetting purchases and returning to step 0.");
           // Reset
           nextTempPurchases = [];
           nextStepIndex = 0;
@@ -580,10 +597,13 @@ export default function App() {
     
     // --- NIGHT PRICING CALL STATE MACHINE ---
     else if (activeCall.type === "night") {
+      console.log("[Call Mode] Processing Night Pricing Call flow...");
       const unpriced = db.getUnpricedItems(selectedDate);
       const shopsList = Object.keys(unpriced);
+      console.log("[Call Mode] Unpriced shops list:", shopsList);
       
       if (shopsList.length === 0) {
+        console.log("[Call Mode] All shops already priced. Ending call.");
         nextUtterance = language === "mr"
           ? "सर्व दर सेट केले आहेत. धन्यवाद!"
           : "All prices are set. Thank you!";
@@ -592,11 +612,14 @@ export default function App() {
         const currentShopName = shopsList[nextShopIndex];
         const itemsList = unpriced[currentShopName];
         const currentItemName = itemsList[nextItemIndex];
+        console.log("[Call Mode] Current Shop:", currentShopName, "Current Item:", currentItemName);
 
         if (nextStepIndex === 0) {
           // Step 0: capturing price
           const price = numbers[0];
+          console.log("[Call Mode] Price parsing attempt:", price);
           if (price) {
+            console.log(`[Call Mode] Setting price in database: ${currentItemName} at ${currentShopName} = ₹${price}`);
             // Apply price setting in database
             db.setPrice(currentShopName, selectedDate, currentItemName, price);
 
@@ -604,6 +627,7 @@ export default function App() {
             if (nextItemIndex + 1 < itemsList.length) {
               nextItemIndex += 1;
               const nextItem = itemsList[nextItemIndex];
+              console.log("[Call Mode] Moving to next item in same shop:", nextItem);
               nextUtterance = language === "mr"
                 ? `${currentItemName} चा दर ₹${price} सेट केला आहे. आता ${currentShopName} च्या ${nextItem} चा दर काय आहे?`
                 : `Set ${currentItemName} to ₹${price}. What is the price for ${nextItem} at ${currentShopName}?`;
@@ -612,10 +636,12 @@ export default function App() {
               nextItemIndex = 0;
               const nextShop = shopsList[nextShopIndex];
               const nextItem = unpriced[nextShop][0];
+              console.log("[Call Mode] Moving to next shop:", nextShop, "and its first item:", nextItem);
               nextUtterance = language === "mr"
                 ? `${currentItemName} चा दर ₹${price} सेट केला आहे. आता ${nextShop} दुकानासाठी, ${nextItem} चा दर काय आहे?`
                 : `Set ${currentItemName} to ₹${price}. Now for ${nextShop}, what is the price for ${nextItem}?`;
             } else {
+              console.log("[Call Mode] All shops and items successfully priced. Moving to step 1 (invoice generation confirmation).");
               // All priced and locked! Prompt to generate bill
               nextUtterance = language === "mr"
                 ? `सर्व दुकानांचे दर नोंदवले आहेत आणि बिले लॉक झाली आहेत. मी बिल पाठवू का? 'होय' किंवा 'नाही' म्हणा.`
@@ -623,17 +649,21 @@ export default function App() {
               nextStepIndex = 1; // invoice prompt step
             }
           } else {
+            console.log("[Call Mode] Failed to parse price from input.");
             nextUtterance = language === "mr"
               ? `दर समजला नाही. कृपया दर पुन्हा सांगा.`
               : "I didn't catch the price. Please repeat the unit rate.";
           }
         } else if (nextStepIndex === 1) {
-          // Step 1: billing invoice confirmation
+          console.log("[Call Mode] Night billing confirmation step query:", query);
           if (query.includes("yes") || query.includes("हो") || query.includes("पाठव")) {
+            console.log("[Call Mode] Invoice confirmation received. Triggering billing runs for all locked ledger shops:");
             // Generate invoices for all shops that had deliveries today
             db.getShops().forEach(s => {
               const led = db.getLedger(s.name, selectedDate);
+              console.log(` - Checking ledger for ${s.name}: exists=`, !!led, "status=", led?.status);
               if (led && led.status === "locked") {
+                console.log(`   -> Generating invoice for shop: ${s.name}`);
                 db.generateInvoice(s.name, selectedDate);
               }
             });
@@ -641,6 +671,7 @@ export default function App() {
               ? "बिले तयार करून पाठवली आहेत. धन्यवाद, शुभ रात्री!"
               : "Invoices generated and shared. Thank you, good night!";
           } else {
+            console.log("[Call Mode] Invoice generation declined.");
             nextUtterance = language === "mr"
               ? "ठीक आहे, बिले जतन केली आहेत. तुम्ही नंतर शेअर करू शकता. शुभ रात्री!"
               : "Okay, bills are saved. You can share them manually later. Good night!";
@@ -652,12 +683,24 @@ export default function App() {
     
     // --- ON DEMAND CALL STATE MACHINE ---
     else {
+      console.log("[Call Mode] On-Demand Call: Forwarding input text to Gemini NLP engine...");
       const result = await processVoiceInput(spokenText, role, language);
+      console.log("[Call Mode] Gemini NLP response received:", JSON.stringify(result.responseText));
       nextUtterance = result.responseText;
       if (query.includes("bye") || query.includes("थांब") || query.includes("कॉल संपवा")) {
+        console.log("[Call Mode] Match call-termination command. Hanging up.");
         isDone = true;
       }
     }
+
+    console.log("[Call Mode] Updating active call state:", {
+      nextUtterance,
+      nextStepIndex,
+      nextShopIndex,
+      nextItemIndex,
+      nextTempPurchasesLength: nextTempPurchases.length,
+      isDone
+    });
 
     setActiveCall(curr => {
       if (curr) {
@@ -677,6 +720,7 @@ export default function App() {
     synthesizeSpeech(nextUtterance, language);
 
     if (isDone) {
+      console.log("[Call Mode] Scheduled call hangup in 5 seconds...");
       setTimeout(() => {
         handleEndCall();
       }, 5000);

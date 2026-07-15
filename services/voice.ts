@@ -1,4 +1,5 @@
 import { createAudioPlayer, AudioModule, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EncodingType } from 'expo-file-system';
 import { Platform } from 'react-native';
@@ -17,42 +18,66 @@ export async function transcribeAudio(audioBlobUrl: string): Promise<string> {
   }
 
   try {
-    const formData = new FormData();
     if (Platform.OS === 'web') {
       console.log("[Sarvam AI] Web Mode: Fetching blob from URI:", audioBlobUrl);
       const responseBlob = await fetch(audioBlobUrl);
       const blob = await responseBlob.blob();
       console.log("[Sarvam AI] Web Blob size:", blob.size, "bytes");
+
+      const formData = new FormData();
       formData.append("file", blob, "recording.wav");
+      formData.append("model", "saaras:v3");
+      formData.append("language_code", "unknown");
+
+      console.log("[Sarvam AI] Sending STT REST request to Sarvam API...");
+      const response = await fetch("https://api.sarvam.ai/speech-to-text", {
+        method: "POST",
+        headers: {
+          "api-subscription-key": apiKey || ""
+        },
+        body: formData
+      });
+
+      console.log("[Sarvam AI] STT Response received. Status:", response.status);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      console.log("[Sarvam AI] transcribeAudio. PATH: REAL API success");
+      console.log("[Sarvam AI] STT Transcribed text:", JSON.stringify(data.transcript));
+      return data.transcript || "";
     } else {
-      console.log("[Sarvam AI] Native Mode: Appending local URI to FormData:", audioBlobUrl);
-      formData.append("file", {
-        uri: audioBlobUrl,
-        type: "audio/wav",
-        name: "recording.wav"
-      } as any);
+      console.log("[Sarvam AI] Native Mode: Uploading local URI via FileSystem.uploadAsync:", audioBlobUrl);
+      
+      const result = await uploadAsync(
+        "https://api.sarvam.ai/speech-to-text",
+        audioBlobUrl,
+        {
+          headers: {
+            "api-subscription-key": apiKey || ""
+          },
+          httpMethod: "POST" as any,
+          uploadType: FileSystemUploadType.MULTIPART,
+          fieldName: "file",
+          mimeType: "audio/wav",
+          parameters: {
+            model: "saaras:v3",
+            language_code: "unknown"
+          }
+        }
+      );
+
+      console.log("[Sarvam AI] STT Response received. Status:", result.status);
+      const data = JSON.parse(result.body);
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(data.message || `HTTP ${result.status}`);
+      }
+
+      console.log("[Sarvam AI] transcribeAudio. PATH: REAL API success");
+      console.log("[Sarvam AI] STT Transcribed text:", JSON.stringify(data.transcript));
+      return data.transcript || "";
     }
-    formData.append("model", "saaras:v3");
-    formData.append("language_code", "unknown");
-
-    console.log("[Sarvam AI] Sending STT REST request to Sarvam API...");
-    const response = await fetch("https://api.sarvam.ai/speech-to-text", {
-      method: "POST",
-      headers: {
-        "api-subscription-key": apiKey || ""
-      },
-      body: formData
-    });
-
-    console.log("[Sarvam AI] STT Response received. Status:", response.status);
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP ${response.status}`);
-    }
-
-    console.log("[Sarvam AI] transcribeAudio. PATH: REAL API success");
-    console.log("[Sarvam AI] STT Transcribed text:", JSON.stringify(data.transcript));
-    return data.transcript || "";
   } catch (error: any) {
     console.log(`[Sarvam AI] transcribeAudio. PATH: REAL API error: ${error.message}`);
     console.log("[Sarvam AI] transcribeAudio. PATH: MOCK fallback");
