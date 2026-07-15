@@ -9,10 +9,32 @@ import {
   TextInput,
   Modal,
   Image,
+  SafeAreaView,
+  Pressable,
+  Platform,
 } from 'react-native';
 import * as db from './services/db';
 import { processVoiceInput } from './services/gemini';
 import { startContinuousListening, synthesizeSpeech } from './services/voice';
+import { Theme } from './styles/theme';
+import {
+  Menu as MenuIcon,
+  Phone,
+  X,
+  Plus,
+  Mic,
+  Send,
+  Home as HomeIcon,
+  BookOpen,
+  CheckSquare,
+  Settings as SettingsIcon,
+  Folder,
+} from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 
 // Translation dictionary
 const TRANSLATIONS = {
@@ -232,6 +254,49 @@ export default function App() {
   useEffect(() => {
     activeCallRef.current = activeCall;
   }, [activeCall]);
+
+  // --- Side Drawer States & Reanimated Animations ---
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const drawerTranslateX = useSharedValue(-300);
+  const backdropOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (isDrawerOpen) {
+      drawerTranslateX.value = withTiming(0, { duration: 250 });
+      backdropOpacity.value = withTiming(0.6, { duration: 250 });
+    } else {
+      drawerTranslateX.value = withTiming(-300, { duration: 200 });
+      backdropOpacity.value = withTiming(0, { duration: 200 });
+    }
+  }, [isDrawerOpen]);
+
+  const animatedDrawerStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: drawerTranslateX.value }],
+    };
+  });
+
+  const animatedBackdropStyle = useAnimatedStyle(() => {
+    return {
+      opacity: backdropOpacity.value,
+    };
+  });
+
+  const handleCloseDrawer = () => {
+    drawerTranslateX.value = withTiming(-300, { duration: 200 });
+    backdropOpacity.value = withTiming(0, { duration: 200 });
+    setTimeout(() => {
+      setIsDrawerOpen(false);
+    }, 200);
+  };
+
+  const handleNavPress = (tabName: 'home' | 'ledger' | 'approvals' | 'settings') => {
+    handleCloseDrawer();
+    setTimeout(() => {
+      setCurrentTab(tabName);
+      refreshData();
+    }, 200);
+  };
 
   // Load database on start
   useEffect(() => {
@@ -1093,110 +1158,225 @@ export default function App() {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {/* Header bar */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>{t.appTitle}</Text>
-          <Text style={styles.headerSubtitle}>{t.syncStatus}</Text>
-        </View>
-        <View style={styles.headerBadgeContainer}>
-          <Text style={styles.badgeText}>
-            {role === 'admin' ? "👑 Admin" : (language === 'mr' ? "👤 नॉर्मल" : "👤 Normal")} | {language === 'en' ? "EN" : "मराठी"}
-          </Text>
-        </View>
-      </View>
+  // Render Drawer
+  const renderDrawer = () => {
+    if (!isDrawerOpen) return null;
 
-      {/* Main Tab Views */}
-      <View style={styles.content}>
-        {currentTab === 'home' && (
-          <ScrollView contentContainerStyle={styles.tabContent}>
-            {/* Simulated Scheduler & Time warp widget */}
-            <View style={styles.simulatedTimeWidget}>
-              <View style={styles.simTimeHeader}>
-                <Text style={styles.simTimeLabel}>🕰️ {t.simTimeLabel}</Text>
-                <Text style={styles.simTimeClock}>{getFormattedSimTime()}</Text>
-              </View>
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        {/* Backdrop overlay */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseDrawer}>
+          <Animated.View style={[styles.drawerBackdrop, animatedBackdropStyle]} />
+        </Pressable>
 
-              {/* Time Warp Actions */}
-              <View style={styles.row}>
-                <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(15)}>
-                  <Text style={styles.warpBtnText}>{t.timeWarp15}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(30)}>
-                  <Text style={styles.warpBtnText}>{t.timeWarp30}</Text>
-                </TouchableOpacity>
-              </View>
+        {/* Panel */}
+        <Animated.View style={[styles.drawerPanel, animatedDrawerStyle]}>
+          <View style={styles.drawerHeader}>
+            <Text style={styles.drawerTitle}>{t.appTitle}</Text>
+            <TouchableOpacity style={styles.drawerCloseBtn} onPress={handleCloseDrawer}>
+              <X size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
+            </TouchableOpacity>
+          </View>
 
-              {/* Instant Call Triggers */}
-              <View style={styles.row}>
-                <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("morning")}>
-                  <Text style={styles.triggerCallBtnText}>{t.triggerMorningCall}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("night")}>
-                  <Text style={styles.triggerCallBtnText}>{t.triggerNightCall}</Text>
-                </TouchableOpacity>
-              </View>
+          {/* New Chat Button */}
+          <TouchableOpacity style={styles.newChatBtn} onPress={() => handleNavPress('home')}>
+            <Text style={styles.newChatBtnText}>New Chat</Text>
+            <Plus size={20} color={Theme.colors.primaryText} strokeWidth={1.5} />
+          </TouchableOpacity>
 
-              {/* Active Retry Banners */}
-              {retryCallType && retryTimeRemaining !== null && (
-                <View style={styles.retryBanner}>
-                  <Text style={styles.retryBannerText}>
-                    ⏳ {t.retryBanner} {retryTimeRemaining} {t.minutes} ({retryCallType === 'morning' ? t.morningCallTitle : t.nightCallTitle})
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Dynamic AI Status box */}
-            <View style={styles.aiStatusBox}>
-              <Text style={styles.voicePromptText}>
-                {isListening ? t.micListening : isProcessing ? t.micProcessing : t.micTapToSpeak}
-              </Text>
-              
-              {recognizedText ? (
-                <Text style={styles.recognizedText}>" {recognizedText} "</Text>
-              ) : null}
-
-              {aiSpeechOutput ? (
-                <View style={styles.speechBubble}>
-                  <Text style={styles.aiSpeechText}>🔊 {aiSpeechOutput}</Text>
-                </View>
-              ) : null}
-            </View>
-
-            {/* Controls */}
-            <View style={styles.voiceControlsContainer}>
-              <TouchableOpacity
-                style={[styles.micBigButton, isListening && styles.micListeningActive]}
-                onPress={handleMicPress}
-              >
-                <Text style={styles.micIconText}>{isListening ? "⏹️" : "🎙️"}</Text>
-                <Text style={styles.micButtonSubtext}>{t.quickNoteTitle}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Large Call Mode Trigger */}
-            <TouchableOpacity style={styles.fullWidthCallBtn} onPress={() => initiateRinging("on_demand")}>
-              <Text style={styles.fullWidthCallBtnText}>{t.callBtn}</Text>
+          <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerScrollContent}>
+            {/* Conversations / Navigation Section */}
+            <Text style={styles.drawerSectionHeader}>Navigation</Text>
+            
+            <TouchableOpacity
+              style={[styles.drawerNavItem, currentTab === 'home' && styles.drawerNavItemActive]}
+              onPress={() => handleNavPress('home')}
+            >
+              <HomeIcon size={20} color={currentTab === 'home' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={[styles.drawerNavText, currentTab === 'home' && styles.drawerNavTextActive]}>{t.tabHome}</Text>
             </TouchableOpacity>
 
-            {/* Fallback Keyboard Input for Testing/Conversations */}
-            <View style={styles.keyboardInputRow}>
-              <TextInput
-                style={styles.textInput}
-                value={textCommand}
-                onChangeText={setTextCommand}
-                placeholder={t.voiceCommandPlaceholder}
-                onSubmitEditing={() => submitTextInput(textCommand)}
-              />
-              <TouchableOpacity style={styles.sendBtn} onPress={() => submitTextInput(textCommand)}>
-                <Text style={styles.sendBtnText}>{t.sendBtn}</Text>
+            <TouchableOpacity
+              style={[styles.drawerNavItem, currentTab === 'ledger' && styles.drawerNavItemActive]}
+              onPress={() => handleNavPress('ledger')}
+            >
+              <BookOpen size={20} color={currentTab === 'ledger' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={[styles.drawerNavText, currentTab === 'ledger' && styles.drawerNavTextActive]}>{t.tabLedger}</Text>
+            </TouchableOpacity>
+
+            {role === 'admin' && (
+              <TouchableOpacity
+                style={[styles.drawerNavItem, currentTab === 'approvals' && styles.drawerNavItemActive]}
+                onPress={() => handleNavPress('approvals')}
+              >
+                <CheckSquare size={20} color={currentTab === 'approvals' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
+                <Text style={[styles.drawerNavText, currentTab === 'approvals' && styles.drawerNavTextActive]}>{t.tabApprovals}</Text>
               </TouchableOpacity>
-            </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.drawerNavItem, currentTab === 'settings' && styles.drawerNavItemActive]}
+              onPress={() => handleNavPress('settings')}
+            >
+              <SettingsIcon size={20} color={currentTab === 'settings' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Text style={[styles.drawerNavText, currentTab === 'settings' && styles.drawerNavTextActive]}>{t.tabSettings}</Text>
+            </TouchableOpacity>
+
+            {/* Shops Section */}
+            <Text style={styles.drawerSectionHeader}>Shops</Text>
+            {shops.map(shop => (
+              <TouchableOpacity
+                key={shop.id}
+                style={styles.drawerShopItem}
+                onPress={() => handleNavPress('ledger')}
+              >
+                <Folder size={18} color={Theme.colors.accent} strokeWidth={1.5} />
+                <Text style={styles.drawerShopText} numberOfLines={1}>{shop.name}</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
-        )}
+
+          {/* Footer Section */}
+          <View style={styles.drawerFooter}>
+            <Text style={styles.drawerFooterRole}>
+              {role === 'admin' ? "👑 Admin" : "👤 Normal"}
+            </Text>
+            <Text style={styles.drawerFooterLang}>
+              Language: {language === 'en' ? "English" : "Marathi"}
+            </Text>
+          </View>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeContainer}>
+      <View style={styles.container}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.topBarButton} onPress={() => setIsDrawerOpen(true)}>
+            <MenuIcon size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
+          </TouchableOpacity>
+          <Text style={styles.topBarTitle}>Logit AI</Text>
+          <TouchableOpacity style={styles.topBarButton} onPress={() => initiateRinging("on_demand")}>
+            <Phone size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Main Tab Views */}
+        <View style={styles.content}>
+          {currentTab === 'home' && (
+            <View style={styles.homeTabContainer}>
+              <ScrollView contentContainerStyle={[styles.tabContent, { paddingBottom: 100 }]}>
+                {/* Simulated Scheduler & Time warp widget */}
+                <View style={styles.simulatedTimeWidget}>
+                  <View style={styles.simTimeHeader}>
+                    <Text style={styles.simTimeLabel}>🕰️ {t.simTimeLabel}</Text>
+                    <Text style={styles.simTimeClock}>{getFormattedSimTime()}</Text>
+                  </View>
+
+                  {/* Time Warp Actions */}
+                  <View style={styles.row}>
+                    <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(15)}>
+                      <Text style={styles.warpBtnText}>{t.timeWarp15}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(30)}>
+                      <Text style={styles.warpBtnText}>{t.timeWarp30}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Instant Call Triggers */}
+                  <View style={styles.row}>
+                    <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("morning")}>
+                      <Text style={styles.triggerCallBtnText}>{t.triggerMorningCall}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("night")}>
+                      <Text style={styles.triggerCallBtnText}>{t.triggerNightCall}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Active Retry Banners */}
+                  {retryCallType && retryTimeRemaining !== null && (
+                    <View style={styles.retryBanner}>
+                      <Text style={styles.retryBannerText}>
+                        ⏳ {t.retryBanner} {retryTimeRemaining} {t.minutes} ({retryCallType === 'morning' ? t.morningCallTitle : t.nightCallTitle})
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Dynamic AI Status box */}
+                <View style={styles.aiStatusBox}>
+                  <Text style={styles.voicePromptText}>
+                    {isListening ? t.micListening : isProcessing ? t.micProcessing : t.micTapToSpeak}
+                  </Text>
+                  
+                  {recognizedText ? (
+                    <Text style={styles.recognizedText}>" {recognizedText} "</Text>
+                  ) : null}
+
+                  {aiSpeechOutput ? (
+                    <View style={styles.speechBubble}>
+                      <Text style={styles.aiSpeechText}>🔊 {aiSpeechOutput}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Controls */}
+                <View style={styles.voiceControlsContainer}>
+                  <TouchableOpacity
+                    style={[styles.micBigButton, isListening && styles.micListeningActive]}
+                    onPress={handleMicPress}
+                  >
+                    <Text style={styles.micIconText}>{isListening ? "⏹️" : "🎙️"}</Text>
+                    <Text style={styles.micButtonSubtext}>{t.quickNoteTitle}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Large Call Mode Trigger */}
+                <TouchableOpacity style={styles.fullWidthCallBtn} onPress={() => initiateRinging("on_demand")}>
+                  <Text style={styles.fullWidthCallBtnText}>{t.callBtn}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* Floating Bottom Input Pill */}
+              <View style={styles.floatingInputWrapper}>
+                <View style={styles.inputPill}>
+                  <TouchableOpacity style={styles.inputPillAction}>
+                    <Plus size={20} color={Theme.colors.mutedText} strokeWidth={1.5} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={styles.pillTextInput}
+                    value={textCommand}
+                    onChangeText={setTextCommand}
+                    placeholder="Ask Logit AI..."
+                    placeholderTextColor={Theme.colors.mutedText}
+                    onSubmitEditing={() => {
+                      if (textCommand.trim()) {
+                        submitTextInput(textCommand);
+                      }
+                    }}
+                  />
+                  {textCommand.trim() ? (
+                    <TouchableOpacity
+                      style={styles.pillSendBtn}
+                      onPress={() => submitTextInput(textCommand)}
+                    >
+                      <Send size={18} color={Theme.colors.accent} strokeWidth={2} />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.pillMicBtn, isListening && styles.pillMicBtnActive]}
+                      onPress={handleMicPress}
+                    >
+                      <Mic size={18} color={isListening ? Theme.colors.primaryText : Theme.colors.mutedText} strokeWidth={1.5} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
 
         {currentTab === 'ledger' && (
           <ScrollView contentContainerStyle={styles.tabContent}>
@@ -1557,51 +1737,202 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Navigation tabs */}
-      <View style={styles.navigation}>
-        <TouchableOpacity
-          style={[styles.navTab, currentTab === 'home' && styles.activeTab]}
-          onPress={() => { setCurrentTab('home'); refreshData(); }}
-        >
-          <Text style={styles.navIcon}>🎙️</Text>
-          <Text style={styles.navText}>{t.tabHome}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.navTab, currentTab === 'ledger' && styles.activeTab]}
-          onPress={() => { setCurrentTab('ledger'); refreshData(); }}
-        >
-          <Text style={styles.navIcon}>📝</Text>
-          <Text style={styles.navText}>{t.tabLedger}</Text>
-        </TouchableOpacity>
-
-        {role === 'admin' && (
-          <TouchableOpacity
-            style={[styles.navTab, currentTab === 'approvals' && styles.activeTab]}
-            onPress={() => { setCurrentTab('approvals'); refreshData(); }}
-          >
-            <Text style={styles.navIcon}>👥</Text>
-            <Text style={styles.navText}>{t.tabApprovals}</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[styles.navTab, currentTab === 'settings' && styles.activeTab]}
-          onPress={() => { setCurrentTab('settings'); refreshData(); }}
-        >
-          <Text style={styles.navIcon}>⚙️</Text>
-          <Text style={styles.navText}>{t.tabSettings}</Text>
-        </TouchableOpacity>
+      {/* Drawer rendering */}
+      {renderDrawer()}
+      <StatusBar style="light" />
       </View>
-      <StatusBar style="dark" />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: Theme.colors.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f5f7fb',
+    backgroundColor: Theme.colors.background,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 56,
+    paddingHorizontal: Theme.spacing.gutter,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.border,
+    backgroundColor: Theme.colors.background,
+  },
+  topBarButton: {
+    padding: Theme.spacing.base,
+    borderRadius: Theme.radius.button,
+  },
+  topBarTitle: {
+    ...Theme.typography.bodyLg,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
+  },
+  homeTabContainer: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: Theme.colors.background,
+  },
+  floatingInputWrapper: {
+    position: 'absolute',
+    bottom: Theme.spacing.md,
+    left: Theme.spacing.marginMobile,
+    right: Theme.spacing.marginMobile,
+    alignItems: 'center',
+  },
+  inputPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 720,
+    minHeight: 48,
+    backgroundColor: Theme.colors.surface,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.button,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.xs,
+  },
+  inputPillAction: {
+    marginRight: Theme.spacing.base,
+  },
+  pillTextInput: {
+    flex: 1,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
+    paddingVertical: Theme.spacing.xs,
+  },
+  pillSendBtn: {
+    padding: Theme.spacing.base,
+    backgroundColor: 'transparent',
+  },
+  pillMicBtn: {
+    padding: Theme.spacing.base,
+    borderRadius: Theme.radius.button,
+  },
+  pillMicBtnActive: {
+    backgroundColor: Theme.colors.accent,
+  },
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#000000',
+  },
+  drawerPanel: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 300,
+    backgroundColor: Theme.colors.background,
+    borderRightWidth: 1,
+    borderRightColor: Theme.colors.border,
+    paddingTop: Platform.OS === 'ios' ? 40 : 20,
+    zIndex: 100,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Theme.spacing.marginMobile,
+    paddingVertical: Theme.spacing.sm,
+  },
+  drawerTitle: {
+    ...Theme.typography.headlineLgMobile,
+    fontWeight: '900',
+    color: Theme.colors.primaryText,
+    letterSpacing: -0.5,
+  },
+  drawerCloseBtn: {
+    padding: Theme.spacing.xs,
+  },
+  newChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.card,
+    marginHorizontal: Theme.spacing.marginMobile,
+    marginVertical: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.sm,
+  },
+  newChatBtnText: {
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
+  },
+  drawerScroll: {
+    flex: 1,
+  },
+  drawerScrollContent: {
+    paddingHorizontal: Theme.spacing.marginMobile,
+    paddingBottom: Theme.spacing.md,
+  },
+  drawerSectionHeader: {
+    ...Theme.typography.labelSm,
+    color: Theme.colors.mutedText,
+    textTransform: 'uppercase',
+    marginTop: Theme.spacing.md,
+    marginBottom: Theme.spacing.xs,
+    paddingHorizontal: Theme.spacing.xs,
+  },
+  drawerNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.sm,
+    borderRadius: Theme.radius.card / 2,
+    marginVertical: Theme.spacing.xs,
+  },
+  drawerNavItemActive: {
+    backgroundColor: Theme.colors.surface,
+  },
+  drawerNavText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.secondaryText,
+    marginLeft: Theme.spacing.sm,
+  },
+  drawerNavTextActive: {
+    color: Theme.colors.primaryText,
+    fontWeight: '600',
+  },
+  drawerShopItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: Theme.colors.border,
+    borderRadius: Theme.radius.card,
+    padding: Theme.spacing.sm,
+    marginVertical: Theme.spacing.xs,
+  },
+  drawerShopText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.primaryText,
+    marginLeft: Theme.spacing.sm,
+  },
+  drawerFooter: {
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.border,
+    paddingHorizontal: Theme.spacing.marginMobile,
+    paddingVertical: Theme.spacing.md,
+  },
+  drawerFooterRole: {
+    ...Theme.typography.bodyMd,
+    fontWeight: '600',
+    color: Theme.colors.primaryText,
+  },
+  drawerFooterLang: {
+    ...Theme.typography.labelSm,
+    color: Theme.colors.mutedText,
+    marginTop: Theme.spacing.xs,
   },
   onboardContainer: {
     flex: 1,
