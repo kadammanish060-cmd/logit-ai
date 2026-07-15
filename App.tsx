@@ -454,6 +454,10 @@ export default function App() {
   // Ringing accepted -> active call
   const handleAcceptCall = async () => {
     if (!activeCall) return;
+    if (isCallLoopActiveRef.current) {
+      console.log("[Call Loop] handleAcceptCall aborted: loop is already active.");
+      return;
+    }
     
     // Clear ringing timeout
     if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
