@@ -382,11 +382,11 @@ export default function App() {
 
   useEffect(() => {
     if (isDrawerOpen) {
-      drawerTranslateX.value = withSpring(0, { damping: 15, stiffness: 100 });
-      backdropOpacity.value = withTiming(0.6, { duration: 250 });
+      drawerTranslateX.value = withSpring(0, { damping: 20, stiffness: 150 });
+      backdropOpacity.value = withTiming(0.5, { duration: 250 });
     } else {
-      drawerTranslateX.value = withSpring(-300, { damping: 18, stiffness: 120 });
-      backdropOpacity.value = withTiming(0, { duration: 200 });
+      drawerTranslateX.value = withSpring(-300, { damping: 20, stiffness: 150 });
+      backdropOpacity.value = withTiming(0, { duration: 250 });
     }
   }, [isDrawerOpen]);
 
@@ -403,19 +403,13 @@ export default function App() {
   });
 
   const handleCloseDrawer = () => {
-    drawerTranslateX.value = withTiming(-300, { duration: 200 });
-    backdropOpacity.value = withTiming(0, { duration: 200 });
-    setTimeout(() => {
-      setIsDrawerOpen(false);
-    }, 200);
+    setIsDrawerOpen(false);
   };
 
   const handleNavPress = (tabName: 'home' | 'ledger' | 'approvals' | 'settings') => {
-    handleCloseDrawer();
-    setTimeout(() => {
-      setCurrentTab(tabName);
-      refreshData();
-    }, 200);
+    setIsDrawerOpen(false);
+    setCurrentTab(tabName);
+    refreshData();
   };
 
   // --- Attachment Picker States & Animations ---
@@ -1360,10 +1354,11 @@ export default function App() {
 
   // Render Drawer
   const renderDrawer = () => {
-    if (!isDrawerOpen) return null;
-
     return (
-      <View style={StyleSheet.absoluteFill}>
+      <View 
+        style={[StyleSheet.absoluteFill, { zIndex: 100 }]} 
+        pointerEvents={isDrawerOpen ? 'auto' : 'none'}
+      >
         {/* Backdrop overlay */}
         <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseDrawer}>
           <Animated.View style={[styles.drawerBackdrop, animatedBackdropStyle]} />
@@ -1373,31 +1368,29 @@ export default function App() {
         <Animated.View style={[styles.drawerPanel, animatedDrawerStyle]}>
           <View style={styles.drawerHeader}>
             <Text style={styles.drawerTitle}>Logit AI</Text>
-            <TouchableOpacity style={styles.drawerCloseBtn} activeOpacity={0.7} onPress={handleCloseDrawer}>
+            <ScalePressable style={styles.drawerCloseBtn} onPress={handleCloseDrawer}>
               <X size={22} color={Theme.colors.primaryText} strokeWidth={1.5} />
-            </TouchableOpacity>
+            </ScalePressable>
           </View>
 
           {/* New Chat Button */}
-          <TouchableOpacity style={styles.newChatBtn} activeOpacity={0.7} onPress={() => handleNavPress('home')}>
+          <ScalePressable style={styles.newChatBtn} onPress={() => handleNavPress('home')}>
             <Text style={styles.newChatBtnText}>New Chat</Text>
             <Plus size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
-          </TouchableOpacity>
+          </ScalePressable>
 
           <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerScrollContent}>
             {/* History Section */}
-            <TouchableOpacity
+            <ScalePressable
               style={[styles.drawerNavItem, currentTab === 'home' && styles.drawerNavItemActive]}
-              activeOpacity={0.7}
               onPress={() => handleNavPress('home')}
             >
               <MessageSquare size={18} color={currentTab === 'home' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
               <Text style={[styles.drawerNavText, currentTab === 'home' && styles.drawerNavTextActive]}>Conversation History</Text>
-            </TouchableOpacity>
+            </ScalePressable>
 
-            <TouchableOpacity
+            <ScalePressable
               style={styles.drawerNavItem}
-              activeOpacity={0.7}
               onPress={() => {
                 handleCloseDrawer();
                 Alert.alert(
@@ -1409,7 +1402,7 @@ export default function App() {
             >
               <History size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerNavText}>Voice History</Text>
-            </TouchableOpacity>
+            </ScalePressable>
 
             {/* Divider */}
             <View style={styles.drawerDivider} />
@@ -1419,13 +1412,12 @@ export default function App() {
             {shops.map(shop => {
               const isSelected = selectedShopId === shop.id;
               return (
-                <TouchableOpacity
+                <ScalePressable
                   key={shop.id}
                   style={[
                     styles.drawerShopCard,
                     isSelected && styles.drawerShopCardSelected
                   ]}
-                  activeOpacity={0.7}
                   onPress={() => {
                     setSelectedShopId(shop.id);
                     handleNavPress('ledger');
@@ -1441,16 +1433,15 @@ export default function App() {
                   >
                     {shop.name}
                   </Text>
-                </TouchableOpacity>
+                </ScalePressable>
               );
             })}
           </ScrollView>
 
           {/* Footer Section */}
           <View style={styles.drawerFooter}>
-            <TouchableOpacity
+            <ScalePressable
               style={styles.drawerFooterLink}
-              activeOpacity={0.7}
               onPress={() => {
                 setSelectedShopId(null);
                 handleNavPress('settings');
@@ -1458,31 +1449,28 @@ export default function App() {
             >
               <PlusCircle size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerFooterLinkText}>Add Shop</Text>
-            </TouchableOpacity>
+            </ScalePressable>
 
             {role === 'admin' && (
-              <TouchableOpacity
+              <ScalePressable
                 style={styles.drawerFooterLink}
-                activeOpacity={0.7}
                 onPress={() => handleNavPress('approvals')}
               >
                 <CheckSquare size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
                 <Text style={styles.drawerFooterLinkText}>Approvals</Text>
-              </TouchableOpacity>
+              </ScalePressable>
             )}
 
-            <TouchableOpacity
+            <ScalePressable
               style={styles.drawerFooterLink}
-              activeOpacity={0.7}
               onPress={() => handleNavPress('settings')}
             >
               <SettingsIcon size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerFooterLinkText}>Settings</Text>
-            </TouchableOpacity>
+            </ScalePressable>
 
-            <TouchableOpacity
+            <ScalePressable
               style={styles.drawerFooterLink}
-              activeOpacity={0.7}
               onPress={() => {
                 Alert.alert(
                   'About Logit AI',
@@ -1493,7 +1481,7 @@ export default function App() {
             >
               <Info size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerFooterLinkText}>About</Text>
-            </TouchableOpacity>
+            </ScalePressable>
           </View>
         </Animated.View>
       </View>
