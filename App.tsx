@@ -64,6 +64,7 @@ import Animated, {
   withSequence,
   withDelay,
   withSpring,
+  Easing,
 } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -382,11 +383,17 @@ export default function App() {
 
   useEffect(() => {
     if (isDrawerOpen) {
-      drawerTranslateX.value = withSpring(0, { damping: 20, stiffness: 150 });
-      backdropOpacity.value = withTiming(0.5, { duration: 250 });
+      drawerTranslateX.value = withTiming(0, {
+        duration: 260,
+        easing: Easing.out(Easing.cubic)
+      });
+      backdropOpacity.value = withTiming(0.5, { duration: 260 });
     } else {
-      drawerTranslateX.value = withSpring(-300, { damping: 20, stiffness: 150 });
-      backdropOpacity.value = withTiming(0, { duration: 250 });
+      drawerTranslateX.value = withTiming(-300, {
+        duration: 260,
+        easing: Easing.out(Easing.cubic)
+      });
+      backdropOpacity.value = withTiming(0, { duration: 260 });
     }
   }, [isDrawerOpen]);
 
