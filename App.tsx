@@ -1481,43 +1481,6 @@ export default function App() {
                 ref={scrollViewRef}
                 contentContainerStyle={[styles.tabContent, { paddingBottom: 140 }]}
               >
-                {/* Simulated Scheduler & Time warp widget */}
-                <View style={styles.simulatedTimeWidget}>
-                  <View style={styles.simTimeHeader}>
-                    <Text style={styles.simTimeLabel}>🕰️ {t.simTimeLabel}</Text>
-                    <Text style={styles.simTimeClock}>{getFormattedSimTime()}</Text>
-                  </View>
-
-                  {/* Time Warp Actions */}
-                  <View style={styles.row}>
-                    <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(15)}>
-                      <Text style={styles.warpBtnText}>{t.timeWarp15}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.warpBtn} onPress={() => handleTimeWarp(30)}>
-                      <Text style={styles.warpBtnText}>{t.timeWarp30}</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Instant Call Triggers */}
-                  <View style={styles.row}>
-                    <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("morning")}>
-                      <Text style={styles.triggerCallBtnText}>{t.triggerMorningCall}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.triggerCallBtn} onPress={() => initiateRinging("night")}>
-                      <Text style={styles.triggerCallBtnText}>{t.triggerNightCall}</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Active Retry Banners */}
-                  {retryCallType && retryTimeRemaining !== null && (
-                    <View style={styles.retryBanner}>
-                      <Text style={styles.retryBannerText}>
-                        ⏳ {t.retryBanner} {retryTimeRemaining} {t.minutes} ({retryCallType === 'morning' ? t.morningCallTitle : t.nightCallTitle})
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
                 {/* Chat Messages */}
                 <View style={styles.chatContainer}>
                   {chatMessages.map((msg) => {
@@ -1562,22 +1525,6 @@ export default function App() {
                     </View>
                   )}
                 </View>
-
-                {/* Controls */}
-                <View style={styles.voiceControlsContainer}>
-                  <TouchableOpacity
-                    style={[styles.micBigButton, isListening && styles.micListeningActive]}
-                    onPress={handleMicPress}
-                  >
-                    <Text style={styles.micIconText}>{isListening ? "⏹️" : "🎙️"}</Text>
-                    <Text style={styles.micButtonSubtext}>{t.quickNoteTitle}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Large Call Mode Trigger */}
-                <TouchableOpacity style={styles.fullWidthCallBtn} onPress={() => initiateRinging("on_demand")}>
-                  <Text style={styles.fullWidthCallBtnText}>{t.callBtn}</Text>
-                </TouchableOpacity>
               </ScrollView>
 
               {/* Backdrop capture for attachment menu */}
