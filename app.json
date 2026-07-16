@@ -30,7 +30,8 @@
         {
           "microphonePermission": "Allow Logit AI to access your microphone to record audio."
         }
-      ]
+      ],
+      "expo-asset"
     ]
   }
 }
