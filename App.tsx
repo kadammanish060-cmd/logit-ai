@@ -54,6 +54,7 @@ import {
   ShieldAlert,
   User,
   ArrowRight,
+  ArrowUp,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -64,6 +65,46 @@ import Animated, {
   withDelay,
   withSpring,
 } from 'react-native-reanimated';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const ScalePressable = ({
+  onPress,
+  style,
+  children,
+  disabled
+}: {
+  onPress?: () => void;
+  style?: any;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withTiming(0.96, { duration: 80 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withTiming(1, { duration: 80 });
+  };
+
+  return (
+    <AnimatedPressable
+      disabled={disabled}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      style={[style, animatedStyle]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
 
 // Translation dictionary
 const TRANSLATIONS = {
@@ -1464,13 +1505,21 @@ export default function App() {
       <View style={styles.container}>
         {/* Top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.topBarButton} activeOpacity={0.7} onPress={() => setIsDrawerOpen(true)}>
-            <MenuIcon size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
-          </TouchableOpacity>
-          <Text style={styles.topBarTitle}>Logit AI</Text>
-          <TouchableOpacity style={styles.topBarButton} activeOpacity={0.7} onPress={() => initiateRinging("on_demand")}>
-            <Phone size={24} color={Theme.colors.primaryText} strokeWidth={1.5} />
-          </TouchableOpacity>
+          <View style={styles.topBarLeftContainer}>
+            <ScalePressable style={styles.topBarButton} onPress={() => setIsDrawerOpen(true)}>
+              <MenuIcon size={24} color="#FFFFFF" strokeWidth={1.5} />
+            </ScalePressable>
+          </View>
+          
+          <View style={styles.topBarCenterContainer}>
+            <Text style={styles.topBarTitle}>Logit AI</Text>
+          </View>
+
+          <View style={styles.topBarRightContainer}>
+            <ScalePressable style={styles.topBarButton} onPress={() => initiateRinging("on_demand")}>
+              <Phone size={24} color="#FFFFFF" strokeWidth={1.5} />
+            </ScalePressable>
+          </View>
         </View>
 
         {/* Main Tab Views */}
@@ -1588,13 +1637,13 @@ export default function App() {
               <View style={styles.floatingInputWrapper}>
                 <View style={styles.inputPill}>
                   {/* Left: + Button */}
-                  <TouchableOpacity
+                  <ScalePressable
                     style={styles.inputPillAction}
                     disabled={isListening}
                     onPress={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
                   >
                     <Plus size={20} color={isListening ? Theme.colors.mutedText : Theme.colors.secondaryText} strokeWidth={1.5} />
-                  </TouchableOpacity>
+                  </ScalePressable>
 
                   {/* Center: Listening Indicator vs Text Input */}
                   {isListening ? (
@@ -1613,7 +1662,7 @@ export default function App() {
                       value={textCommand}
                       onChangeText={setTextCommand}
                       placeholder="Speak or type..."
-                      placeholderTextColor={Theme.colors.mutedText}
+                      placeholderTextColor="#8A8A8A"
                       onSubmitEditing={() => {
                         if (textCommand.trim()) {
                           submitTextInput(textCommand);
@@ -1624,26 +1673,26 @@ export default function App() {
 
                   {/* Right: Mic or Circular Blue Send Button */}
                   {isListening ? (
-                    <TouchableOpacity
+                    <ScalePressable
                       style={styles.pillMicBtnActiveCircular}
                       onPress={handleMicPress}
                     >
                       <Mic size={16} color="#FFFFFF" strokeWidth={2} />
-                    </TouchableOpacity>
+                    </ScalePressable>
                   ) : textCommand.trim() ? (
-                    <TouchableOpacity
+                    <ScalePressable
                       style={styles.pillSendBtnCircular}
                       onPress={() => submitTextInput(textCommand)}
                     >
-                      <Send size={16} color="#FFFFFF" strokeWidth={2.5} />
-                    </TouchableOpacity>
+                      <ArrowUp size={20} color="#FFFFFF" strokeWidth={2.5} />
+                    </ScalePressable>
                   ) : (
-                    <TouchableOpacity
+                    <ScalePressable
                       style={styles.pillMicBtnCircular}
                       onPress={handleMicPress}
                     >
-                      <Mic size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
-                    </TouchableOpacity>
+                      <Mic size={20} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+                    </ScalePressable>
                   )}
                 </View>
               </View>
@@ -2077,20 +2126,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 56,
-    paddingHorizontal: Theme.spacing.gutter,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
-    backgroundColor: Theme.colors.background,
+    height: 64,
+    paddingHorizontal: 24,
+    backgroundColor: '#000000',
+    position: 'relative',
+  },
+  topBarLeftContainer: {
+    zIndex: 10,
+  },
+  topBarCenterContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  topBarRightContainer: {
+    zIndex: 10,
   },
   topBarButton: {
-    padding: Theme.spacing.base,
-    borderRadius: Theme.radius.button,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1F1F1F',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topBarTitle: {
-    ...Theme.typography.bodyLg,
-    fontWeight: '600',
-    color: Theme.colors.primaryText,
+    fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : 'System',
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   homeTabContainer: {
     flex: 1,
@@ -2129,9 +2198,9 @@ const styles = StyleSheet.create({
   },
   floatingInputWrapper: {
     position: 'absolute',
-    bottom: Theme.spacing.md,
-    left: Theme.spacing.marginMobile,
-    right: Theme.spacing.marginMobile,
+    bottom: 24,
+    left: 20,
+    right: 20,
     alignItems: 'center',
     zIndex: 99,
   },
@@ -2140,22 +2209,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     maxWidth: 720,
-    minHeight: 48,
-    backgroundColor: Theme.colors.surface,
+    height: 60,
+    backgroundColor: '#1F1F1F',
     borderWidth: 1,
-    borderColor: Theme.colors.border,
-    borderRadius: Theme.radius.button,
-    paddingHorizontal: Theme.spacing.gutter,
-    paddingVertical: Theme.spacing.xs,
+    borderColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 999,
+    paddingHorizontal: 16,
   },
   inputPillAction: {
     marginRight: Theme.spacing.base,
   },
   pillTextInput: {
     flex: 1,
-    ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
-    paddingVertical: Theme.spacing.xs,
+    fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : 'System',
+    fontSize: 16,
+    color: '#FFFFFF',
   },
   pillSendBtn: {
     padding: Theme.spacing.base,
