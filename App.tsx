@@ -441,6 +441,27 @@ export default function App() {
     };
   });
 
+  // --- Input Bar Cross-Fade Animation ---
+  const typingOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    typingOpacity.value = withTiming(textCommand.trim() ? 1 : 0, { duration: 180 });
+  }, [textCommand]);
+
+  const micAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: 1 - typingOpacity.value,
+      transform: [{ scale: 1 - 0.3 * typingOpacity.value }],
+    };
+  });
+
+  const sendAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: typingOpacity.value,
+      transform: [{ scale: 0.7 + 0.3 * typingOpacity.value }],
+    };
+  });
+
   // Load database on start
   useEffect(() => {
     db.loadDatabase();
@@ -1637,7 +1658,7 @@ export default function App() {
                     disabled={isListening}
                     onPress={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
                   >
-                    <Plus size={20} color={isListening ? Theme.colors.mutedText : Theme.colors.secondaryText} strokeWidth={1.5} />
+                    <Plus size={20} color={isListening ? Theme.colors.mutedText : '#8E8E93'} strokeWidth={1.5} />
                   </ScalePressable>
 
                   {/* Center: Listening Indicator vs Text Input */}
@@ -1657,7 +1678,7 @@ export default function App() {
                       value={textCommand}
                       onChangeText={setTextCommand}
                       placeholder="Speak or type..."
-                      placeholderTextColor="#8A8A8A"
+                      placeholderTextColor="#8E8E93"
                       onSubmitEditing={() => {
                         if (textCommand.trim()) {
                           submitTextInput(textCommand);
@@ -1666,7 +1687,7 @@ export default function App() {
                     />
                   )}
 
-                  {/* Right: Mic or Circular Blue Send Button */}
+                  {/* Right: Mic or Circular Blue Send Button with Cross-Fade */}
                   {isListening ? (
                     <ScalePressable
                       style={styles.pillMicBtnActiveCircular}
@@ -1674,20 +1695,36 @@ export default function App() {
                     >
                       <Mic size={16} color="#FFFFFF" strokeWidth={2} />
                     </ScalePressable>
-                  ) : textCommand.trim() ? (
-                    <ScalePressable
-                      style={styles.pillSendBtnCircular}
-                      onPress={() => submitTextInput(textCommand)}
-                    >
-                      <ArrowUp size={20} color="#FFFFFF" strokeWidth={2.5} />
-                    </ScalePressable>
                   ) : (
-                    <ScalePressable
-                      style={styles.pillMicBtnCircular}
-                      onPress={handleMicPress}
-                    >
-                      <Mic size={20} color={Theme.colors.secondaryText} strokeWidth={1.5} />
-                    </ScalePressable>
+                    <View style={styles.pillRightActionContainer}>
+                      <Animated.View 
+                        style={[micAnimatedStyle, { position: 'absolute' }]}
+                        pointerEvents={textCommand.trim() ? 'none' : 'auto'}
+                      >
+                        <ScalePressable
+                          style={styles.pillMicBtnCircular}
+                          onPress={handleMicPress}
+                        >
+                          <Mic size={20} color="#8E8E93" strokeWidth={1.5} />
+                        </ScalePressable>
+                      </Animated.View>
+
+                      <Animated.View 
+                        style={[sendAnimatedStyle, { position: 'absolute' }]}
+                        pointerEvents={textCommand.trim() ? 'auto' : 'none'}
+                      >
+                        <ScalePressable
+                          style={styles.pillSendBtnCircular}
+                          onPress={() => {
+                            if (textCommand.trim()) {
+                              submitTextInput(textCommand);
+                            }
+                          }}
+                        >
+                          <ArrowUp size={20} color="#FFFFFF" strokeWidth={2.5} />
+                        </ScalePressable>
+                      </Animated.View>
+                    </View>
                   )}
                 </View>
               </View>
@@ -2193,9 +2230,9 @@ const styles = StyleSheet.create({
   },
   floatingInputWrapper: {
     position: 'absolute',
-    bottom: 24,
-    left: 20,
-    right: 20,
+    bottom: 20,
+    left: '4%',
+    right: '4%',
     alignItems: 'center',
     zIndex: 99,
   },
@@ -2203,26 +2240,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    maxWidth: 720,
-    height: 60,
-    backgroundColor: '#1F1F1F',
+    height: 56,
+    backgroundColor: '#242424',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
     borderRadius: 999,
-    paddingHorizontal: 16,
+    paddingLeft: 12,
+    paddingRight: 12,
   },
   inputPillAction: {
-    marginRight: Theme.spacing.base,
+    padding: 8,
+    marginRight: 4,
   },
   pillTextInput: {
     flex: 1,
     fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : 'System',
     fontSize: 16,
+    fontWeight: '500',
     color: '#FFFFFF',
+    paddingVertical: 0,
   },
-  pillSendBtn: {
-    padding: Theme.spacing.base,
-    backgroundColor: 'transparent',
+  pillRightActionContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
   pillSendBtnCircular: {
     width: 32,
@@ -2232,14 +2275,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pillMicBtn: {
-    padding: Theme.spacing.base,
-    borderRadius: Theme.radius.button,
-  },
   pillMicBtnCircular: {
     width: 32,
     height: 32,
-    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
