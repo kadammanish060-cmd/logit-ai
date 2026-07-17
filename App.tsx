@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   StyleSheet,
   Text,
@@ -17,7 +18,8 @@ import {
 import * as db from './services/db';
 import { processVoiceInput } from './services/gemini';
 import { startContinuousListening, synthesizeSpeech } from './services/voice';
-import { Theme } from './styles/theme';
+import { Theme, useTheme, ThemeProvider, DarkColors, ThemeType } from './styles/theme';
+import { ShopLedgerScreen } from './components/ShopLedgerScreen';
 import { BusinessCardDispatcher } from './components/BusinessCards';
 import {
   Menu as MenuIcon,
@@ -311,7 +313,17 @@ const WaveformBar = ({ delay }: { delay: number }) => {
   );
 };
 
-export default function App() {
+function MainApp() {
+  // Theme context
+  const { theme, activeTheme, colors, setTheme } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors), [colors]);
+
+  const animatedBgStyle = useAnimatedStyle(() => {
+    return {
+      backgroundColor: withTiming(colors.background, { duration: 250 }),
+    };
+  });
+
   // Onboarding Settings
   const [hasOnboarded, setHasOnboarded] = useState(false);
   const [language, setLanguage] = useState<'en' | 'mr'>('en');
@@ -1352,7 +1364,7 @@ export default function App() {
             onPress={() => setRole('admin')}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ShieldAlert size={18} color={role === 'admin' ? '#FFFFFF' : Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+              <ShieldAlert size={18} color={role === 'admin' ? '#FFFFFF' : colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
               <Text style={styles.roleCardText}>{t.adminRole}</Text>
             </View>
           </TouchableOpacity>
@@ -1363,7 +1375,7 @@ export default function App() {
             onPress={() => setRole('normal')}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <User size={18} color={role === 'normal' ? '#FFFFFF' : Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+              <User size={18} color={role === 'normal' ? '#FFFFFF' : colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
               <Text style={styles.roleCardText}>{t.normalRole}</Text>
             </View>
           </TouchableOpacity>
@@ -1384,8 +1396,7 @@ export default function App() {
   const renderDrawer = () => {
     return (
       <View 
-        style={[StyleSheet.absoluteFill, { zIndex: 100 }]} 
-        pointerEvents={isDrawerOpen ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { zIndex: 100, pointerEvents: isDrawerOpen ? 'auto' : 'none' }]}
       >
         {/* Backdrop overlay */}
         <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseDrawer}>
@@ -1397,14 +1408,14 @@ export default function App() {
           <View style={styles.drawerHeader}>
             <Text style={styles.drawerTitle}>Logit AI</Text>
             <ScalePressable style={styles.drawerCloseBtn} onPress={handleCloseDrawer}>
-              <X size={22} color={Theme.colors.primaryText} strokeWidth={1.5} />
+              <X size={22} color={colors.primaryText} strokeWidth={1.5} />
             </ScalePressable>
           </View>
 
           {/* New Chat Button */}
           <ScalePressable style={styles.newChatBtn} onPress={() => handleNavPress('home')}>
             <Text style={styles.newChatBtnText}>New Chat</Text>
-            <Plus size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+            <Plus size={18} color={colors.primaryText} strokeWidth={1.5} />
           </ScalePressable>
 
           <ScrollView style={styles.drawerScroll} contentContainerStyle={styles.drawerScrollContent}>
@@ -1413,7 +1424,7 @@ export default function App() {
               style={[styles.drawerNavItem, currentTab === 'home' && styles.drawerNavItemActive]}
               onPress={() => handleNavPress('home')}
             >
-              <MessageSquare size={18} color={currentTab === 'home' ? Theme.colors.primaryText : Theme.colors.secondaryText} strokeWidth={1.5} />
+              <MessageSquare size={18} color={currentTab === 'home' ? colors.primaryText : colors.secondaryText} strokeWidth={1.5} />
               <Text style={[styles.drawerNavText, currentTab === 'home' && styles.drawerNavTextActive]}>Conversation History</Text>
             </ScalePressable>
 
@@ -1428,7 +1439,7 @@ export default function App() {
                 );
               }}
             >
-              <History size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <History size={18} color={colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerNavText}>Voice History</Text>
             </ScalePressable>
 
@@ -1451,7 +1462,7 @@ export default function App() {
                     handleNavPress('ledger');
                   }}
                 >
-                  <Folder size={18} color={isSelected ? Theme.colors.accent : Theme.colors.secondaryText} strokeWidth={1.5} />
+                  <Folder size={18} color={isSelected ? colors.accent : colors.secondaryText} strokeWidth={1.5} />
                   <Text
                     style={[
                       styles.drawerShopCardText,
@@ -1475,7 +1486,7 @@ export default function App() {
                 handleNavPress('settings');
               }}
             >
-              <PlusCircle size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <PlusCircle size={18} color={colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerFooterLinkText}>Add Shop</Text>
             </ScalePressable>
 
@@ -1484,7 +1495,7 @@ export default function App() {
                 style={styles.drawerFooterLink}
                 onPress={() => handleNavPress('approvals')}
               >
-                <CheckSquare size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+                <CheckSquare size={18} color={colors.secondaryText} strokeWidth={1.5} />
                 <Text style={styles.drawerFooterLinkText}>Approvals</Text>
               </ScalePressable>
             )}
@@ -1493,7 +1504,7 @@ export default function App() {
               style={styles.drawerFooterLink}
               onPress={() => handleNavPress('settings')}
             >
-              <SettingsIcon size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <SettingsIcon size={18} color={colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerFooterLinkText}>Settings</Text>
             </ScalePressable>
 
@@ -1507,7 +1518,7 @@ export default function App() {
                 );
               }}
             >
-              <Info size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+              <Info size={18} color={colors.secondaryText} strokeWidth={1.5} />
               <Text style={styles.drawerFooterLinkText}>About</Text>
             </ScalePressable>
           </View>
@@ -1517,7 +1528,7 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <Animated.View style={[styles.safeContainer, animatedBgStyle]}>
       <View style={styles.container}>
         {/* Top bar */}
         <View style={styles.topBar}>
@@ -1610,7 +1621,7 @@ export default function App() {
                       Alert.alert('Camera', 'Accessing camera...');
                     }}
                   >
-                    <Camera size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <Camera size={18} color={colors.primaryText} strokeWidth={1.5} />
                     <Text style={styles.attachmentItemText}>Camera</Text>
                   </TouchableOpacity>
 
@@ -1621,7 +1632,7 @@ export default function App() {
                       Alert.alert('Photos', 'Opening photo library...');
                     }}
                   >
-                    <ImageIcon size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <ImageIcon size={18} color={colors.primaryText} strokeWidth={1.5} />
                     <Text style={styles.attachmentItemText}>Photos</Text>
                   </TouchableOpacity>
 
@@ -1632,7 +1643,7 @@ export default function App() {
                       Alert.alert('Files', 'Opening document explorer...');
                     }}
                   >
-                    <FileText size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <FileText size={18} color={colors.primaryText} strokeWidth={1.5} />
                     <Text style={styles.attachmentItemText}>Files</Text>
                   </TouchableOpacity>
 
@@ -1643,7 +1654,7 @@ export default function App() {
                       Alert.alert('Plugins', 'Opening plugins store...');
                     }}
                   >
-                    <Grid size={18} color={Theme.colors.primaryText} strokeWidth={1.5} />
+                    <Grid size={18} color={colors.primaryText} strokeWidth={1.5} />
                     <Text style={styles.attachmentItemText}>Plugins</Text>
                   </TouchableOpacity>
                 </Animated.View>
@@ -1658,7 +1669,7 @@ export default function App() {
                     disabled={isListening}
                     onPress={() => setIsAttachmentMenuOpen(!isAttachmentMenuOpen)}
                   >
-                    <Plus size={20} color={isListening ? Theme.colors.mutedText : '#8E8E93'} strokeWidth={1.5} />
+                    <Plus size={20} color={isListening ? colors.mutedText : '#8E8E93'} strokeWidth={1.5} />
                   </ScalePressable>
 
                   {/* Center: Listening Indicator vs Text Input */}
@@ -1698,8 +1709,7 @@ export default function App() {
                   ) : (
                     <View style={styles.pillRightActionContainer}>
                       <Animated.View 
-                        style={[micAnimatedStyle, { position: 'absolute' }]}
-                        pointerEvents={textCommand.trim() ? 'none' : 'auto'}
+                        style={[micAnimatedStyle, { position: 'absolute', pointerEvents: textCommand.trim() ? 'none' : 'auto' }]}
                       >
                         <ScalePressable
                           style={styles.pillMicBtnCircular}
@@ -1710,8 +1720,7 @@ export default function App() {
                       </Animated.View>
 
                       <Animated.View 
-                        style={[sendAnimatedStyle, { position: 'absolute' }]}
-                        pointerEvents={textCommand.trim() ? 'auto' : 'none'}
+                        style={[sendAnimatedStyle, { position: 'absolute', pointerEvents: textCommand.trim() ? 'auto' : 'none' }]}
                       >
                         <ScalePressable
                           style={styles.pillSendBtnCircular}
@@ -1732,120 +1741,11 @@ export default function App() {
           )}
 
         {currentTab === 'ledger' && (
-          <ScrollView contentContainerStyle={styles.tabContent}>
-            <Text style={styles.sectionTitle}>{t.ledgerTitle}</Text>
-            
-            {/* Date Selector Row */}
-            <View style={styles.dateSelectorRow}>
-              <Text style={styles.dateLabel}>Date:</Text>
-              <TextInput
-                style={styles.dateInput}
-                value={selectedDate}
-                onChangeText={setSelectedDate}
-                placeholder="YYYY-MM-DD"
-              />
-            </View>
-
-            {/* Render ledger tables per shop */}
-            {shops.map(shop => {
-              const ledger = db.getLedger(shop.name, selectedDate);
-              const hasItems = ledger && Object.keys(ledger.items).length > 0;
-
-              return (
-                <View key={shop.id} style={styles.ledgerShopCard}>
-                  <View style={styles.ledgerShopHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Store size={18} color={Theme.colors.primaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
-                      <Text style={styles.ledgerShopName}>{shop.name}</Text>
-                    </View>
-                    <View style={styles.ledgerShopBalance}>
-                      <Text style={styles.balanceText}>{t.outstandingBalance}: ₹{shop.outstandingBalance}</Text>
-                    </View>
-                  </View>
-
-                  {hasItems ? (
-                    <View>
-                      {/* Status indicator */}
-                      <View style={styles.ledgerStatusIndicator}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          {ledger.status === 'locked' ? (
-                            <Lock size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 4 }} />
-                          ) : (
-                            <Unlock size={14} color={Theme.colors.accent} strokeWidth={1.5} style={{ marginRight: 4 }} />
-                          )}
-                          <Text style={styles.statusBadge}>
-                            {ledger.status === 'locked' ? t.lockedLabel : ledger.status === 'priced' ? "Priced" : "Open"}
-                          </Text>
-                        </View>
-                        {ledger.totalBill !== null && (
-                          <Text style={styles.totalBillText}>₹{ledger.totalBill}</Text>
-                        )}
-                      </View>
-
-                      {/* Items Table */}
-                      <View style={styles.tableHeader}>
-                        <Text style={[styles.th, {flex: 2}]}>Item</Text>
-                        <Text style={[styles.th, {flex: 1, textAlign: 'center'}]}>Qty</Text>
-                        <Text style={[styles.th, {flex: 1, textAlign: 'right'}]}>Rate</Text>
-                        <Text style={[styles.th, {flex: 1.5, textAlign: 'right'}]}>Total</Text>
-                        <Text style={[styles.th, {flex: 1, textAlign: 'center'}]}>Edit</Text>
-                      </View>
-
-                      {Object.values(ledger.items).map((item) => (
-                        <View key={item.id} style={styles.tableRow}>
-                          <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.td}>{item.itemName}</Text>
-                            {item.status === 'pending_approval' && (
-                              <Clock size={12} color={Theme.colors.secondaryText} style={{ marginLeft: 6 }} />
-                            )}
-                          </View>
-                          <Text style={[styles.td, {flex: 1, textAlign: 'center'}]}>{item.quantity}</Text>
-                          <Text style={[styles.td, {flex: 1, textAlign: 'right'}]}>
-                            {item.unitPrice !== null ? `₹${item.unitPrice}` : "-"}
-                          </Text>
-                          <Text style={[styles.td, {flex: 1.5, textAlign: 'right'}]}>
-                            {item.lineTotal !== null ? `₹${item.lineTotal}` : "-"}
-                          </Text>
-                          
-                          <TouchableOpacity
-                            style={styles.editRowBtn}
-                            activeOpacity={0.7}
-                            onPress={() => {
-                              setEditingEntry({
-                                shopId: shop.id,
-                                date: selectedDate,
-                                itemId: item.id,
-                                itemName: item.itemName,
-                                quantity: item.quantity,
-                                unitPrice: item.unitPrice
-                              });
-                              setEditModalVisible(true);
-                            }}
-                          >
-                            <Edit2 size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} />
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                      {ledger.status === 'locked' && (
-                        <TouchableOpacity
-                          style={styles.generateInvoiceBtn}
-                          activeOpacity={0.7}
-                          onPress={() => handleGenerateAndShareInvoice(shop.name, selectedDate)}
-                        >
-                          <Share2 size={16} color="#FFFFFF" strokeWidth={1.5} style={{ marginRight: 8 }} />
-                          <Text style={styles.generateInvoiceBtnText}>
-                            {t.generateInvoiceBtn}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  ) : (
-                    <Text style={styles.emptyText}>{t.noEntries}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
+          <ShopLedgerScreen
+            shopId={selectedShopId || 'shop_1'}
+            onBack={() => handleNavPress('home')}
+            colors={colors}
+          />
         )}
 
         {currentTab === 'approvals' && (
@@ -1857,9 +1757,9 @@ export default function App() {
                   <View style={styles.approvalHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       {req.type === 'delivery' ? (
-                        <Package size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                        <Package size={14} color={colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 6 }} />
                       ) : (
-                        <Coins size={14} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                        <Coins size={14} color={colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 6 }} />
                       )}
                       <Text style={styles.approvalTypeBadge}>
                         {req.type === 'delivery' ? "Delivery" : "Payment"}
@@ -1873,12 +1773,12 @@ export default function App() {
                   <View style={styles.approvalBody}>
                     {req.type === 'delivery' ? (
                       <Text style={styles.approvalDetails}>
-                        Shop: <Text style={{fontWeight: 'bold', color: Theme.colors.primaryText}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
+                        Shop: <Text style={{fontWeight: 'bold', color: colors.primaryText}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
                         Item: {req.data.itemName} | Qty: {req.data.quantity}
                       </Text>
                     ) : (
                       <Text style={styles.approvalDetails}>
-                        Shop: <Text style={{fontWeight: 'bold', color: Theme.colors.primaryText}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
+                        Shop: <Text style={{fontWeight: 'bold', color: colors.primaryText}}>{db.getShops().find(s => s.id === req.data.shopId)?.name}</Text>{"\n"}
                         Amount: ₹{req.data.payment.amount}
                       </Text>
                     )}
@@ -1886,7 +1786,7 @@ export default function App() {
 
                   <View style={styles.approvalActions}>
                     <TouchableOpacity
-                      style={[styles.approvalBtn, {backgroundColor: Theme.colors.accent}]}
+                      style={[styles.approvalBtn, {backgroundColor: colors.accent}]}
                       activeOpacity={0.7}
                       onPress={() => handleApprove(req.id)}
                     >
@@ -1894,12 +1794,12 @@ export default function App() {
                       <Text style={styles.approvalBtnText}>{t.confirmApprove}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.approvalBtn, {backgroundColor: Theme.colors.surfaceElevated, borderWidth: 1, borderColor: Theme.colors.border}]}
+                      style={[styles.approvalBtn, {backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border}]}
                       activeOpacity={0.7}
                       onPress={() => handleReject(req.id)}
                     >
-                      <X size={14} color={Theme.colors.secondaryText} strokeWidth={2} style={{ marginRight: 4 }} />
-                      <Text style={[styles.approvalBtnText, {color: Theme.colors.secondaryText}]}>{t.confirmReject}</Text>
+                      <X size={14} color={colors.secondaryText} strokeWidth={2} style={{ marginRight: 4 }} />
+                      <Text style={[styles.approvalBtnText, {color: colors.secondaryText}]}>{t.confirmReject}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1964,7 +1864,7 @@ export default function App() {
             <View style={styles.ringingOverlay}>
               <View style={styles.ringingCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                  <Phone size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
+                  <Phone size={18} color={colors.secondaryText} strokeWidth={1.5} style={{ marginRight: 8 }} />
                   <Text style={styles.ringingStatusLabel}>{t.incomingCall}</Text>
                 </View>
                 <Text style={styles.ringingCallerName}>{activeCall.callerName}</Text>
@@ -1987,7 +1887,7 @@ export default function App() {
               <Text style={styles.activeCallTitle}>{activeCall.callerName}</Text>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                <Clock size={16} color={Theme.colors.accent} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                <Clock size={16} color={colors.accent} strokeWidth={1.5} style={{ marginRight: 6 }} />
                 <Text style={styles.activeCallTimer}>
                   {Math.floor(activeCall.duration / 60).toString().padStart(2, '0')}:
                   {(activeCall.duration % 60).toString().padStart(2, '0')}
@@ -2005,7 +1905,7 @@ export default function App() {
               {/* AI Speech Utterance Box */}
               <View style={styles.callUtteranceBox}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                  <Volume2 size={18} color={Theme.colors.primaryText} strokeWidth={1.5} style={{ marginRight: 8, marginTop: 3 }} />
+                  <Volume2 size={18} color={colors.primaryText} strokeWidth={1.5} style={{ marginRight: 8, marginTop: 3 }} />
                   <Text style={styles.callUtteranceText}>{activeCall.aiUtterance}</Text>
                 </View>
               </View>
@@ -2014,9 +1914,9 @@ export default function App() {
               <View style={styles.callStatusIndicatorBox}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                   {callIsListening ? (
-                    <Mic size={16} color={Theme.colors.accent} strokeWidth={2} style={{ marginRight: 6 }} />
+                    <Mic size={16} color={colors.accent} strokeWidth={2} style={{ marginRight: 6 }} />
                   ) : (
-                    <Volume2 size={16} color={Theme.colors.accent} strokeWidth={2} style={{ marginRight: 6 }} />
+                    <Volume2 size={16} color={colors.accent} strokeWidth={2} style={{ marginRight: 6 }} />
                   )}
                   <Text style={styles.callStatusIndicatorText}>
                     {callIsListening ? (language === 'mr' ? "ऐकत आहे..." : "Listening...") : (language === 'mr' ? "बोलत आहे..." : "Speaking...")}
@@ -2033,7 +1933,7 @@ export default function App() {
           {activeCall.status === "missed" && (
             <View style={styles.missedCallOverlay}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <AlertCircle size={20} color={Theme.colors.mutedText} strokeWidth={1.5} style={{ marginRight: 6 }} />
+                <AlertCircle size={20} color={colors.mutedText} strokeWidth={1.5} style={{ marginRight: 6 }} />
                 <Text style={styles.missedCallText}>{t.missedCallAlert}</Text>
               </View>
             </View>
@@ -2141,18 +2041,18 @@ export default function App() {
       {renderDrawer()}
       <StatusBar style="light" />
       </View>
-    </SafeAreaView>
+    </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof DarkColors) => StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: Theme.colors.background,
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: Theme.colors.background,
+    backgroundColor: 'transparent',
   },
   topBar: {
     flexDirection: 'row',
@@ -2196,23 +2096,28 @@ const styles = StyleSheet.create({
   homeTabContainer: {
     flex: 1,
     position: 'relative',
-    backgroundColor: Theme.colors.background,
+    backgroundColor: colors.background,
   },
   attachmentPopup: {
     position: 'absolute',
     bottom: 72,
     left: Theme.spacing.marginMobile,
     width: 200,
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderRadius: 24,
     padding: Theme.spacing.sm,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
+    ...Platform.select({
+      web: { boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.3)' },
+      default: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 8,
+      }
+    }),
     zIndex: 100,
   },
   attachmentItem: {
@@ -2224,7 +2129,7 @@ const styles = StyleSheet.create({
   },
   attachmentItemText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     marginLeft: Theme.spacing.md,
     fontWeight: '500',
   },
@@ -2271,7 +2176,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Theme.colors.accent,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2285,7 +2190,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Theme.colors.accent,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2297,7 +2202,7 @@ const styles = StyleSheet.create({
   },
   listeningText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.accent,
+    color: colors.accent,
     fontWeight: '600',
   },
   inputWaveformContainer: {
@@ -2317,7 +2222,7 @@ const styles = StyleSheet.create({
     width: 300,
     backgroundColor: '#000000',
     borderRightWidth: 1,
-    borderRightColor: Theme.colors.border,
+    borderRightColor: colors.border,
     paddingTop: Platform.OS === 'ios' ? 40 : 20,
     zIndex: 100,
   },
@@ -2331,7 +2236,7 @@ const styles = StyleSheet.create({
   drawerTitle: {
     ...Theme.typography.headlineLgMobile,
     fontWeight: '900',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     letterSpacing: -0.5,
   },
   drawerCloseBtn: {
@@ -2341,9 +2246,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderRadius: Theme.radius.card,
     marginHorizontal: Theme.spacing.marginMobile,
     marginVertical: Theme.spacing.sm,
@@ -2353,7 +2258,7 @@ const styles = StyleSheet.create({
   newChatBtnText: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   drawerScroll: {
     flex: 1,
@@ -2364,7 +2269,7 @@ const styles = StyleSheet.create({
   },
   drawerSectionHeader: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
     textTransform: 'uppercase',
     marginTop: Theme.spacing.md,
     marginBottom: Theme.spacing.xs,
@@ -2379,27 +2284,27 @@ const styles = StyleSheet.create({
     marginVertical: Theme.spacing.xs,
   },
   drawerNavItemActive: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   drawerNavText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginLeft: Theme.spacing.sm,
   },
   drawerNavTextActive: {
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   drawerDivider: {
     height: 1,
-    backgroundColor: Theme.colors.border,
+    backgroundColor: colors.border,
     marginVertical: Theme.spacing.md,
     marginHorizontal: Theme.spacing.xs,
   },
   drawerShopCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: 'transparent',
     borderRadius: Theme.radius.card,
@@ -2407,22 +2312,22 @@ const styles = StyleSheet.create({
     marginVertical: Theme.spacing.xs,
   },
   drawerShopCardSelected: {
-    borderColor: Theme.colors.accent,
+    borderColor: colors.accent,
     backgroundColor: '#0c1b2f',
   },
   drawerShopCardText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginLeft: Theme.spacing.sm,
     flex: 1,
   },
   drawerShopCardTextSelected: {
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   drawerFooter: {
     borderTopWidth: 1,
-    borderTopColor: Theme.colors.border,
+    borderTopColor: colors.border,
     paddingHorizontal: Theme.spacing.marginMobile,
     paddingVertical: Theme.spacing.sm,
     backgroundColor: '#000000',
@@ -2436,40 +2341,45 @@ const styles = StyleSheet.create({
   },
   drawerFooterLinkText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginLeft: Theme.spacing.sm,
     fontWeight: '500',
   },
   onboardContainer: {
     flex: 1,
-    backgroundColor: Theme.colors.background,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   onboardCard: {
     width: '90%',
     maxWidth: 450,
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
-    shadowColor: '#000000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    ...Platform.select({
+      web: { boxShadow: '0px 6px 12px rgba(0, 0, 0, 0.15)' },
+      default: {
+        shadowColor: '#000000',
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+      }
+    }),
   },
   onboardTitle: {
     ...Theme.typography.displayLg,
     fontSize: 28,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     textAlign: 'center',
     marginBottom: Theme.spacing.md,
   },
   labelSection: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginTop: Theme.spacing.md,
     marginBottom: Theme.spacing.base,
   },
@@ -2480,17 +2390,17 @@ const styles = StyleSheet.create({
   },
   toggleBtn: {
     flex: 1,
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: Theme.radius.button,
     paddingVertical: Theme.spacing.base,
     marginHorizontal: Theme.spacing.xs,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   activeBtn: {
-    backgroundColor: Theme.colors.accent,
-    borderColor: Theme.colors.accent,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   btnText: {
     ...Theme.typography.bodyMd,
@@ -2498,24 +2408,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   roleSelectCard: {
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
     marginVertical: Theme.spacing.sm,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   activeRoleCard: {
-    borderColor: Theme.colors.accent,
+    borderColor: colors.accent,
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
   },
   roleCardText: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   startBtn: {
-    backgroundColor: Theme.colors.accent,
+    backgroundColor: colors.accent,
     borderRadius: Theme.radius.button,
     paddingVertical: Theme.spacing.base,
     marginTop: Theme.spacing.md,
@@ -2642,7 +2552,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   userMessagePill: {
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 24,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -2650,7 +2560,7 @@ const styles = StyleSheet.create({
   },
   userMessageText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     lineHeight: 20,
   },
   assistantMessageContainer: {
@@ -2659,12 +2569,12 @@ const styles = StyleSheet.create({
   },
   assistantMessageText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     lineHeight: 22,
   },
   typingIndicatorText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
     fontStyle: 'italic',
   },
   voiceControlsContainer: {
@@ -2672,47 +2582,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 15,
   },
-  micBigButton: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#1a237e',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#1a237e',
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  micListeningActive: {
-    backgroundColor: '#c62828',
-    shadowColor: '#c62828',
-  },
-  micIconText: {
-    fontSize: 40,
-  },
-  micButtonSubtext: {
-    color: '#fff',
-    fontSize: 11,
-    marginTop: 6,
-    fontWeight: 'bold',
-  },
-  fullWidthCallBtn: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#2e7d32',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  fullWidthCallBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
   keyboardInputRow: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -2741,7 +2611,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...Theme.typography.bodyLg,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     marginBottom: Theme.spacing.md,
   },
   dateSelectorRow: {
@@ -2751,41 +2621,41 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginRight: Theme.spacing.base,
   },
   dateInput: {
     flex: 1,
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
-    backgroundColor: Theme.colors.surface,
-    borderColor: Theme.colors.border,
+    color: colors.primaryText,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderWidth: 1,
     borderRadius: Theme.radius.button,
     paddingHorizontal: Theme.spacing.base,
     paddingVertical: Theme.spacing.xs,
   },
   ledgerShopCard: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
     marginBottom: Theme.spacing.md,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   ledgerShopHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
+    borderBottomColor: colors.border,
     paddingBottom: Theme.spacing.base,
     marginBottom: Theme.spacing.base,
   },
   ledgerShopName: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   ledgerShopBalance: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -2796,7 +2666,7 @@ const styles = StyleSheet.create({
   balanceText: {
     ...Theme.typography.labelSm,
     fontWeight: '600',
-    color: Theme.colors.accent,
+    color: colors.accent,
   },
   ledgerStatusIndicator: {
     flexDirection: 'row',
@@ -2806,35 +2676,35 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
   },
   totalBillText: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.accent,
+    color: colors.accent,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     paddingVertical: Theme.spacing.sm,
     paddingHorizontal: Theme.spacing.base,
     borderRadius: 12,
   },
   th: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
   },
   tableRow: {
     flexDirection: 'row',
     paddingVertical: Theme.spacing.base,
     paddingHorizontal: Theme.spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
+    borderBottomColor: colors.border,
     alignItems: 'center',
   },
   td: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   editRowBtn: {
     width: 32,
@@ -2842,21 +2712,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   emptyText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
     textAlign: 'center',
     marginVertical: Theme.spacing.md,
   },
   approvalCard: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
     marginBottom: Theme.spacing.base,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   approvalHeader: {
     flexDirection: 'row',
@@ -2866,18 +2736,18 @@ const styles = StyleSheet.create({
   },
   approvalTypeBadge: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   approvalTime: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
   },
   approvalBody: {
     marginBottom: Theme.spacing.base,
   },
   approvalDetails: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     lineHeight: 22,
   },
   approvalActions: {
@@ -2899,35 +2769,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   settingsGroup: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
     marginBottom: Theme.spacing.base,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   settingsLabel: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     marginBottom: Theme.spacing.base,
   },
   toggleBtnWide: {
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: Theme.radius.button,
     paddingVertical: Theme.spacing.base,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   toggleBtnWideText: {
     ...Theme.typography.bodyMd,
     fontWeight: '500',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   listItem: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginVertical: Theme.spacing.xs,
   },
   itemsWrap: {
@@ -2935,21 +2805,21 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   itemTag: {
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     paddingHorizontal: Theme.spacing.base,
     paddingVertical: Theme.spacing.xs,
     borderRadius: Theme.radius.button,
     margin: Theme.spacing.xs,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
   },
   itemTagText: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     fontWeight: '500',
   },
   resetBtn: {
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderWidth: 1,
     borderRadius: Theme.radius.button,
     paddingVertical: Theme.spacing.base,
@@ -2958,15 +2828,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: Theme.spacing.md,
     marginBottom: Theme.spacing.lg,
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
   },
   resetBtnText: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   generateInvoiceBtn: {
-    backgroundColor: Theme.colors.accent,
+    backgroundColor: colors.accent,
     borderRadius: Theme.radius.button,
     paddingVertical: Theme.spacing.base,
     marginTop: Theme.spacing.base,
@@ -2988,34 +2858,34 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '90%',
     maxWidth: 400,
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
   },
   modalTitle: {
     ...Theme.typography.bodyLg,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     marginBottom: Theme.spacing.base,
     textAlign: 'center',
   },
   modalLabel: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
     marginTop: Theme.spacing.base,
     marginBottom: Theme.spacing.xs,
   },
   modalInput: {
-    backgroundColor: Theme.colors.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderRadius: Theme.radius.button,
     paddingHorizontal: Theme.spacing.base,
     paddingVertical: Theme.spacing.base,
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
   },
   modalActions: {
     flexDirection: 'row',
@@ -3206,10 +3076,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 40,
     borderRadius: 30,
-    shadowColor: '#b7094c',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    ...Platform.select({
+      web: { boxShadow: '0px 4px 10px rgba(183, 9, 76, 0.4)' },
+      default: {
+        shadowColor: '#b7094c',
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+      }
+    }),
   },
   hangupBtnText: {
     color: '#fff',
@@ -3251,4 +3126,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     textAlign: 'center',
   },
+
+  themeSelectorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  themeSelectorBtn: {
+    flex: 1,
+    height: 40,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  themeSelectorBtnActive: {
+    borderColor: colors.accent,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  themeSelectorBtnText: {
+    fontSize: 14,
+    color: colors.secondaryText,
+    fontWeight: '500',
+  },
+  themeSelectorBtnTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
+  }
 });
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <MainApp />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}

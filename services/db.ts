@@ -15,6 +15,10 @@ export interface LedgerItem {
   lineTotal: number | null;
   deliveredAt: string; // ISO string
   status: "confirmed" | "pending_approval";
+  source?: "voice" | "manual" | "ocr";
+  transcript?: string;
+  notes?: string;
+  receiptUrl?: string;
 }
 
 export interface Ledger {
@@ -32,6 +36,9 @@ export interface Payment {
   paidAt: string; // ISO string
   loggedBy: "admin" | "normal_pending_approval";
   status: "confirmed" | "pending_approval";
+  source?: "voice" | "manual" | "ocr";
+  notes?: string;
+  receiptUrl?: string;
 }
 
 export interface PurchaseItem {
@@ -200,7 +207,11 @@ export function logDelivery(
   itemName: string,
   quantity: number,
   date?: string,
-  role: "admin" | "normal" = "admin"
+  role: "admin" | "normal" = "admin",
+  source?: "voice" | "manual" | "ocr",
+  transcript?: string,
+  notes?: string,
+  receiptUrl?: string
 ): string {
   const targetDate = date || new Date().toISOString().split("T")[0];
   const normName = normalizeItemName(itemName);
@@ -217,6 +228,10 @@ export function logDelivery(
     unitPrice: null as number | null,
     lineTotal: null as number | null,
     deliveredAt: new Date().toISOString(),
+    source: source || "voice",
+    transcript,
+    notes,
+    receiptUrl,
   };
 
   if (role === "normal") {
@@ -362,7 +377,14 @@ export function generateInvoice(shopName: string, date: string): string {
 }
 
 // 6. logPayment
-export function logPayment(shopName: string, amount: number, role: "admin" | "normal" = "admin"): string {
+export function logPayment(
+  shopName: string,
+  amount: number,
+  role: "admin" | "normal" = "admin",
+  source?: "voice" | "manual" | "ocr",
+  notes?: string,
+  receiptUrl?: string
+): string {
   const shop = findShopByName(shopName);
   if (!shop) return `Error: Shop "${shopName}" not found.`;
 
@@ -373,6 +395,9 @@ export function logPayment(shopName: string, amount: number, role: "admin" | "no
     paidAt: new Date().toISOString(),
     loggedBy: role === "normal" ? "normal_pending_approval" : "admin",
     status: role === "normal" ? "pending_approval" : "confirmed",
+    source: source || "voice",
+    notes,
+    receiptUrl,
   };
 
   if (role === "normal") {
@@ -532,6 +557,80 @@ export function getPurchaseHistory(startDate: string, endDate: string, itemName?
 
 export function getPendingApprovals(): PendingApproval[] {
   return Object.values(dbState.pendingApprovals).filter((p) => p.status === "pending");
+}
+
+export function getLedgersForShop(shopId: string): { [date: string]: Ledger } {
+  return dbState.ledgers[shopId] || {};
+}
+
+export function getPaymentsForShop(shopId: string): { [paymentId: string]: Payment } {
+  return dbState.payments[shopId] || {};
+}
+
+export function updateLedgerItem(
+  shopId: string,
+  date: string,
+  itemId: string,
+  updates: Partial<LedgerItem>
+): boolean {
+  if (!dbState.ledgers[shopId]) return false;
+  const ledger = dbState.ledgers[shopId][date];
+  if (!ledger) return false;
+  const item = ledger.items[itemId];
+  if (!item) return false;
+  
+  const oldLineTotal = item.lineTotal || 0;
+  
+  // Apply updates
+  if (updates.itemName !== undefined) item.itemName = updates.itemName;
+  if (updates.quantity !== undefined) item.quantity = updates.quantity;
+  if (updates.unitPrice !== undefined) item.unitPrice = updates.unitPrice;
+  if (updates.notes !== undefined) item.notes = updates.notes;
+  if (updates.source !== undefined) item.source = updates.source;
+  if (updates.receiptUrl !== undefined) item.receiptUrl = updates.receiptUrl;
+
+  if (item.unitPrice !== null) {
+    item.lineTotal = item.quantity * item.unitPrice;
+  } else {
+    item.lineTotal = null;
+  }
+  
+  // Re-calculate ledger total
+  const hasUnpriced = Object.values(ledger.items).some((i) => i.unitPrice === null);
+  if (!hasUnpriced) {
+    const newTotalBill = Object.values(ledger.items).reduce((sum, i) => sum + (i.lineTotal || 0), 0);
+    ledger.totalBill = newTotalBill;
+    
+    // Adjust outstanding balance
+    dbState.shops[shopId].outstandingBalance = dbState.shops[shopId].outstandingBalance - oldLineTotal + (item.lineTotal || 0);
+  }
+  
+  saveDatabase();
+  return true;
+}
+
+export function updatePayment(
+  shopId: string,
+  paymentId: string,
+  updates: Partial<Payment>
+): boolean {
+  if (!dbState.payments[shopId]) return false;
+  const payment = dbState.payments[shopId][paymentId];
+  if (!payment) return false;
+  
+  const oldAmount = payment.amount;
+  if (updates.amount !== undefined) payment.amount = updates.amount;
+  if (updates.notes !== undefined) payment.notes = updates.notes;
+  if (updates.source !== undefined) payment.source = updates.source;
+  if (updates.receiptUrl !== undefined) payment.receiptUrl = updates.receiptUrl;
+  
+  // Adjust outstanding balance
+  if (updates.amount !== undefined) {
+    dbState.shops[shopId].outstandingBalance = dbState.shops[shopId].outstandingBalance + oldAmount - updates.amount;
+  }
+  
+  saveDatabase();
+  return true;
 }
 
 // Initial DB load

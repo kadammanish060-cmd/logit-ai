@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Theme } from '../styles/theme';
+import { Theme, useTheme } from '../styles/theme';
 import {
   Receipt,
   TrendingDown,
@@ -13,16 +13,22 @@ import {
   BookOpen,
   FileSpreadsheet,
   BarChart3,
-  Calendar,
 } from 'lucide-react-native';
+
+const useCardStyles = () => {
+  const { colors } = useTheme();
+  const styles = React.useMemo(() => getStyles(colors), [colors]);
+  return { styles, colors };
+};
 
 // --- Card 1: Receipt Card ---
 export const ReceiptCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   const isPending = data.isPending ?? data.role === 'normal';
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Receipt size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <Receipt size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Receipt</Text>
         <View style={[styles.badge, isPending ? styles.badgePending : styles.badgeConfirmed]}>
           <Text style={[styles.badgeText, isPending ? styles.badgeTextPending : styles.badgeTextConfirmed]}>
@@ -56,10 +62,11 @@ export const ReceiptCard = ({ data }: { data: any }) => {
 
 // --- Card 2: Expense Card ---
 export const ExpenseCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <TrendingDown size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <TrendingDown size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Expense Logged</Text>
       </View>
       <View style={styles.cardBody}>
@@ -88,10 +95,11 @@ export const ExpenseCard = ({ data }: { data: any }) => {
 
 // --- Card 3: Inventory Card ---
 export const InventoryCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Package size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <Package size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Inventory Update</Text>
       </View>
       <View style={styles.cardBody}>
@@ -116,10 +124,11 @@ export const InventoryCard = ({ data }: { data: any }) => {
 
 // --- Card 4: Supplier Card ---
 export const SupplierCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Truck size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <Truck size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Supplier Rate Update</Text>
       </View>
       <View style={styles.cardBody}>
@@ -142,13 +151,14 @@ export const SupplierCard = ({ data }: { data: any }) => {
 
 // --- Card 5: Approval Card ---
 export const ApprovalCard = ({ data, isApprove }: { data: any; isApprove: boolean }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         {isApprove ? (
-          <CheckCircle2 size={18} color={Theme.colors.accent} strokeWidth={1.5} />
+          <CheckCircle2 size={18} color={colors.accent} strokeWidth={1.5} />
         ) : (
-          <XCircle size={18} color={Theme.colors.mutedText} strokeWidth={1.5} />
+          <XCircle size={18} color={colors.mutedText} strokeWidth={1.5} />
         )}
         <Text style={styles.cardTitle}>Approval Decision</Text>
       </View>
@@ -159,7 +169,7 @@ export const ApprovalCard = ({ data, isApprove }: { data: any; isApprove: boolea
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Resolution</Text>
-          <Text style={[styles.value, isApprove ? styles.accentValue : { color: Theme.colors.mutedText }]}>
+          <Text style={[styles.value, isApprove ? styles.accentValue : { color: colors.mutedText }]}>
             {isApprove ? 'APPROVED' : 'REJECTED'}
           </Text>
         </View>
@@ -170,10 +180,11 @@ export const ApprovalCard = ({ data, isApprove }: { data: any; isApprove: boolea
 
 // --- Card 6: Payment Card ---
 export const PaymentCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <CreditCard size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <CreditCard size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Payment Logged</Text>
       </View>
       <View style={styles.cardBody}>
@@ -198,11 +209,12 @@ export const PaymentCard = ({ data }: { data: any }) => {
 
 // --- Card 7: Customer Balance Card ---
 export const CustomerBalanceCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   const entries = Object.entries(data || {});
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Wallet size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <Wallet size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Customer Balances</Text>
       </View>
       <View style={styles.cardBody}>
@@ -223,10 +235,11 @@ export const CustomerBalanceCard = ({ data }: { data: any }) => {
 
 // --- Card 8: Ledger Entry Card ---
 export const LedgerEntryCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <BookOpen size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <BookOpen size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Ledger Entry Logged</Text>
       </View>
       <View style={styles.cardBody}>
@@ -261,10 +274,11 @@ export const LedgerEntryCard = ({ data }: { data: any }) => {
 
 // --- Card 9: Purchase Order Card ---
 export const PurchaseOrderCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <FileSpreadsheet size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <FileSpreadsheet size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Purchase Order</Text>
       </View>
       <View style={styles.cardBody}>
@@ -287,10 +301,11 @@ export const PurchaseOrderCard = ({ data }: { data: any }) => {
 
 // --- Card 10: Daily Sales Summary Card ---
 export const DailySalesSummaryCard = ({ data }: { data: any }) => {
+  const { styles, colors } = useCardStyles();
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <BarChart3 size={18} color={Theme.colors.secondaryText} strokeWidth={1.5} />
+        <BarChart3 size={18} color={colors.secondaryText} strokeWidth={1.5} />
         <Text style={styles.cardTitle}>Daily Sales Summary</Text>
       </View>
       <View style={styles.cardBody}>
@@ -331,27 +346,17 @@ export const BusinessCardDispatcher = ({
     case 'logDelivery':
       return <ReceiptCard data={toolResult} />;
     case 'logPurchase':
-      return (
-        <View>
-          <PurchaseOrderCard data={toolResult} />
-          <View style={{ height: Theme.spacing.sm }} />
-          <InventoryCard data={toolResult} />
-        </View>
-      );
+      return <ExpenseCard data={toolResult} />;
+    case 'logPayment':
+      return <PaymentCard data={toolResult} />;
     case 'setPrice':
       return <SupplierCard data={toolResult} />;
-    case 'logPayment':
-      return (
-        <View>
-          <PaymentCard data={toolResult} />
-          <View style={{ height: Theme.spacing.sm }} />
-          <ExpenseCard data={toolResult} />
-        </View>
-      );
     case 'lockLedger':
       return <DailySalesSummaryCard data={toolResult} />;
     case 'getOutstandingBalance':
       return <CustomerBalanceCard data={toolResult} />;
+    case 'getLedger':
+      return <LedgerEntryCard data={toolResult} />;
     case 'approveEntry':
       return <ApprovalCard data={toolResult} isApprove={true} />;
     case 'rejectEntry':
@@ -361,11 +366,11 @@ export const BusinessCardDispatcher = ({
   }
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof Theme.colors) => StyleSheet.create({
   card: {
-    backgroundColor: Theme.colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Theme.colors.border,
+    borderColor: colors.border,
     borderRadius: Theme.radius.card,
     padding: Theme.spacing.md,
     width: '100%',
@@ -376,13 +381,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Theme.spacing.base,
     borderBottomWidth: 1,
-    borderBottomColor: Theme.colors.border,
+    borderBottomColor: colors.border,
     paddingBottom: Theme.spacing.sm,
   },
   cardTitle: {
     ...Theme.typography.bodyMd,
     fontWeight: '600',
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     marginLeft: Theme.spacing.sm,
     flex: 1,
   },
@@ -398,24 +403,24 @@ const styles = StyleSheet.create({
   },
   label: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.secondaryText,
+    color: colors.secondaryText,
   },
   value: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.primaryText,
+    color: colors.primaryText,
     fontWeight: '500',
   },
   accentValue: {
-    color: Theme.colors.accent,
+    color: colors.accent,
     fontWeight: '600',
   },
   subValue: {
     ...Theme.typography.labelSm,
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
   },
   noDataText: {
     ...Theme.typography.bodyMd,
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
     textAlign: 'center',
     paddingVertical: Theme.spacing.base,
   },
@@ -435,9 +440,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   badgeTextPending: {
-    color: Theme.colors.mutedText,
+    color: colors.mutedText,
   },
   badgeTextConfirmed: {
-    color: Theme.colors.accent,
+    color: colors.accent,
   },
 });
