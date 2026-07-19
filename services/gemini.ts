@@ -277,7 +277,7 @@ function getSystemPrompt(role: "admin" | "normal", lang: "en" | "mr", date: stri
 
   const roleInstruction = role === "admin" 
     ? "You are logged in as an Admin. You have full write permissions to log deliveries, set prices, and approve/reject pending logs. When a payment or delivery is logged, it will be immediately confirmed." 
-    : "You are logged in as a Normal user (Father/driver). Every delivery or payment you log will enter as 'pending_approval' until an Admin approves it. Always inform the user that their entry has been submitted for review.";
+    : "You are logged in as a Normal user. Every delivery or payment you log will enter as 'pending_approval' until an Admin approves it. Always inform the user that their entry has been submitted for review.";
 
   const langInstruction = lang === "mr"
     ? "Always respond in warm, conversational Marathi (Devanagari script). Translating English words like item names to their Devanagari equivalents or using colloquial Devanagari is fine. For numbers, use standard English digits (e.g., 20, 300) in your response text to ensure clear readability."
