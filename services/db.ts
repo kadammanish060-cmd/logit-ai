@@ -137,6 +137,13 @@ export function saveDatabase() {
     if (typeof window !== "undefined" && window.localStorage) {
       window.localStorage.setItem("logit_ai_db", JSON.stringify(dbState));
     }
+    // Asynchronously push updates to Firestore
+    try {
+      const firebaseService = require('./firebaseService');
+      firebaseService.pushLocalStateToFirestore();
+    } catch (fsErr) {
+      // Ignored if firebase is not fully loaded or active
+    }
   } catch (e) {
     console.error("Failed to save db", e);
   }
@@ -635,3 +642,110 @@ export function updatePayment(
 
 // Initial DB load
 loadDatabase();
+
+export function getLocalState() {
+  return dbState;
+}
+
+export function updateLocalShopFromSync(shopId: string, data: any) {
+  dbState.shops[shopId] = {
+    id: shopId,
+    name: data.name,
+    active: data.active,
+    outstandingBalance: data.outstandingBalance
+  };
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("logit_ai_db", JSON.stringify(dbState));
+    }
+  } catch (e) {
+    console.error("Local save failed", e);
+  }
+}
+
+export function updateLocalTransactionFromSync(txId: string, data: any) {
+  if (data.type === "delivery") {
+    const { shopId, date, itemName, quantity, unitPrice, lineTotal, deliveredAt, status, source, transcript, notes, receiptUrl } = data;
+    if (!dbState.ledgers[shopId]) {
+      dbState.ledgers[shopId] = {};
+    }
+    if (!dbState.ledgers[shopId][date]) {
+      dbState.ledgers[shopId][date] = {
+        date,
+        status: "open",
+        totalBill: null,
+        invoiceGeneratedAt: null,
+        createdBy: "admin",
+        items: {}
+      };
+    }
+    dbState.ledgers[shopId][date].items[txId] = {
+      id: txId,
+      itemName,
+      quantity,
+      unitPrice,
+      lineTotal,
+      deliveredAt,
+      status,
+      source,
+      transcript,
+      notes,
+      receiptUrl
+    };
+  } else if (data.type === "payment") {
+    const { shopId, amount, paidAt, loggedBy, status, source, notes, receiptUrl } = data;
+    if (!dbState.payments[shopId]) {
+      dbState.payments[shopId] = {};
+    }
+    dbState.payments[shopId][txId] = {
+      id: txId,
+      amount,
+      paidAt,
+      loggedBy,
+      status,
+      source,
+      notes,
+      receiptUrl
+    };
+  } else if (data.type === "purchase") {
+    const { date, itemName, quantity, amount, loggedAt } = data;
+    if (!dbState.purchases[date]) {
+      dbState.purchases[date] = {};
+    }
+    dbState.purchases[date][txId] = {
+      id: txId,
+      itemName,
+      quantity,
+      pricePaid: amount,
+      loggedAt
+    };
+  }
+  
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("logit_ai_db", JSON.stringify(dbState));
+    }
+  } catch (e) {
+    console.error("Local save failed", e);
+  }
+}
+
+export function updateLocalApprovalFromSync(appId: string, data: any) {
+  dbState.pendingApprovals[appId] = {
+    id: appId,
+    type: data.type,
+    refPath: data.refPath,
+    data: data.data,
+    submittedBy: data.submittedBy,
+    submittedAt: data.submittedAt,
+    status: data.status
+  };
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.setItem("logit_ai_db", JSON.stringify(dbState));
+    }
+  } catch (e) {
+    console.error("Local save failed", e);
+  }
+}
+

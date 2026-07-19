@@ -1,44 +1,47 @@
-# Logit AI Walkthrough
+# Logit AI Walkthrough & Verification Summary
 
-We have successfully completed **Phase 1, 2, and 3** of the implementation plan. Below is a detailed walkthrough of what was built, how it was verified, and the resulting UI layout.
-
----
-
-## What was Built
-
-1. **Project Baseline:** Prepared a blank TypeScript Expo project configured to build for web and mobile.
-2. **Offline-First Data Layer:** Implemented local state storage seeder with default shops (*Sudamache*, *Joshi wadewale*, *Rahatani Sudamache*) and canonical items (*onion*, *potato*, *chilli Lemon*, etc.).
-3. **Multilingual Speech Translation:** Configured speech synthesis and recognition fallbacks utilizing native browser Web Speech APIs. Created a mock Gemini parser with Devanagari digit mapping support to convert spoken inputs directly into database function operations.
-4. **Onboarding Screen:** Interactive setup enabling users to select language (English/Marathi) and role (Admin/Normal) on startup.
-5. **Interactive Dashboard:**
-   - **Home Tab:** Prominent mic button for Quick Voice Note and text interface for keyboard validation. Shows live transcription and speech bubble output. Includes a simulated clock and time warp (+15m/+30m) buttons.
-   - **Ledger Tab:** Readable tables per shop, showing date-filtered deliveries, price rates, line totals, and ledger statuses.
-   - **On-Click Manual Editor:** Modal form to correct quantities and unit prices directly from the table.
-6. **Call Mode & Scheduled Interventions:**
-   - **Incoming/Active Call Panels:** Ringing UI with Accept/Decline, timer, waveform visualization, and hang-up controls.
-   - **Morning & Night Pricing Scripts:** State machines directing the assistant to interview the user step-by-step for purchases or item pricing.
-   - **Timing Retry logic:** Automatically reschedules unanswered calls in 15 minutes and rejected calls in 30 minutes, keeping track of active retries on the clock widget.
+We have successfully refactored the visual layout, integrated the complete theme system, resolved React Native Web warning messages, redesigned the ledger view, updated the onboarding role selection labels to be generic (removing all hardcoded family relationship names), and verified clean compilation and build exports across all platforms.
 
 ---
 
-## Verification Summary
+## 1. Accomplishments
 
-We used the **Browser Subagent** to execute all system workflows sequentially:
-- **Phase 3 Flow:** Onboarded as Admin/Marathi, ran a Quick Voice Note to log onion deliveries to Sudamache, and successfully updated the quantity and price manually via the table editor.
-- **Phase 4 Flow (Morning Call):** Fast-forwarded simulated time to 10:00 AM to automatically trigger the morning call. Declined it to test the 30-minute retry countdown, let the subsequent 10:30 AM call ring out to test the 15-minute missed call retry, and finally accepted the call at 10:45 AM, inputted purchases, and completed the session.
-- **Phase 5 Flow (Night Call & Invoicing):**
-  1. Triggered the 9:00 PM Night pricing call. Accepted it and supplied the missing rate for tomatoes at Joshi wadewale (₹15), causing the ledger to auto-lock at ₹300.
-  2. Navigated to the **Ledger** tab, clicked the "Generate Bill / 📤 बिल" button for Joshi wadewale, and verified the generated HTML Canvas invoice PNG inside the preview overlay modal.
-  3. Changed the role to **Driver** and logged a payment of ₹200 from Sudamache. The AI confirmed it was submitted for review.
-  4. Switched back to **Admin** role, opened the **Approvals** tab, and approved the payment. Verified that Sudamache's outstanding balance was reduced by ₹200.
+### A. Business Ledger Redesign & Navigation Flow
+- **Direct Shop ledger Navigation:** Tapping on a shop in the Side Menu now opens that specific shop's ledger screen directly, bypassing the legacy selector screen.
+- **Header Structure:** Updated top bars to dynamically reflect the selected shop (e.g. *Sudamache*, *Joshi Wadewale*) with a functional Search input.
+- **Summary Cards & Filters:** Implemented high-contrast summary tiles (showing Total outstanding balance, Total Purchases, Total Paid) paired with quick-select horizontal chips (e.g. *All*, *Deliveries*, *Payments*, *Pending*).
+- **Notion/Apple-Wallet Layout:** Built custom list item rows displaying categorized actions (Delivery/Payment) with transaction statuses and detailed bottom sheets for inline item edits.
+- **Cumulative Table Mode:** Embedded a toggleable spreadsheet-style grid table containing columns for Date, Item, Qty, Price, Total, and Running Balance.
+- **Manual/Voice FAB Option:** Multi-option action buttons enabling voice notes, camera captures, or manual modal entries directly on the ledger.
 
-### Verification Slides
+### B. Onboarding & Settings Role Selection Updates
+- **Generic Role Labels:** Removed parenthetical family role descriptions (`Mother / Founder` and `Father`) from both English and Marathi translation strings inside `App.tsx` and settings components, keeping the interface generic and applicable to any business.
+- **Prompts Update:** Updated the Gemini AI system instructions prompt inside `services/gemini.ts` to use generic role naming guidelines instead of family roles.
+
+### C. Theme Architecture Integration
+- **Persistent Provider:** Implemented a context provider `ThemeProvider` persisted using `AsyncStorage`.
+- **System Theme Synchronization:** Automatically tracks OS preference shifts and syncs Android Navigation Bar styling smoothly with zero-flash transitions.
+- **Theme settings interface:** Allows users to choose between Dark, Light, and System themes instantly from the Settings screen.
+
+### D. Deprecated Warnings Cleanup
+- **Shadow Props Warning:** Replaced web-incompatible `shadowColor`, `shadowOpacity`, `shadowRadius`, `shadowOffset`, and `elevation` properties with CSS `boxShadow` fallbacks via `Platform.select`.
+- **Pointer Events Warning:** Repositioned `pointerEvents` properties inside style declarations cross-platform instead of utilizing them as component properties.
+- **Dead Code:** Cleaned up unused style definitions from legacy views to avoid bundle overhead.
+
+---
+
+## 2. Verification Summary
+
+We verified both type-safety and bundle compiler processes:
+1. **Type Checking:** Ran `npx tsc --noEmit` and resolved dependency limits.
+2. **Production Bundle Verification:** Ran `npx expo export` successfully to build production web, iOS, and Android static bundles.
+3. **Commit & remote Push:** Committed changes with the message `fix: update onboarding role selection screen and remove family references` and pushed to the remote repository.
+
+---
+
+## 3. Verification Screenshots
 ````carousel
-![1. Onboarding & Dashboard](C:/Users/kadam/.gemini/antigravity-ide/brain/04c2902d-1ec3-4203-844a-1ceb25b449bc/home_tab_verified_1783629207362.png)
+![1. Ledger List Mode](C:/Users/kadam/.gemini/antigravity-ide/brain/04c2902d-1ec3-4203-844a-1ceb25b449bc/ledger_list_mode_1784310821485.png)
 <!-- slide -->
-![2. Active Call Conversation](C:/Users/kadam/.gemini/antigravity-ide/brain/04c2902d-1ec3-4203-844a-1ceb25b449bc/typed_input_1783629537272.png)
-<!-- slide -->
-![3. Canvas Invoice Preview Modal](C:/Users/kadam/.gemini/antigravity-ide/brain/04c2902d-1ec3-4203-844a-1ceb25b449bc/invoice_preview_modal_1783630050364.png)
-<!-- slide -->
-![4. Final Ledger Balances](C:/Users/kadam/.gemini/antigravity-ide/brain/04c2902d-1ec3-4203-844a-1ceb25b449bc/ledger_final_verification_1783630172923.png)
+![2. Web Layout Test](C:/Users/kadam/.gemini/antigravity-ide/brain/04c2902d-1ec3-4203-844a-1ceb25b449bc/ledger_web_test_1784310800491.webp)
 ````

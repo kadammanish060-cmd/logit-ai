@@ -1,0 +1,11 @@
+{
+  "firestore": [
+    {
+      "database": "logit-db",
+      "rules": "firestore.rules"
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

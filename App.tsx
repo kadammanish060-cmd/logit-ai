@@ -16,6 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import * as db from './services/db';
+import * as firebaseService from './services/firebaseService';
 import { processVoiceInput } from './services/gemini';
 import { startContinuousListening, synthesizeSpeech } from './services/voice';
 import { Theme, useTheme, ThemeProvider, DarkColors, ThemeType } from './styles/theme';
@@ -329,6 +330,13 @@ function MainApp() {
   const [language, setLanguage] = useState<'en' | 'mr'>('en');
   const [role, setRole] = useState<'admin' | 'normal'>('admin');
 
+  // Firebase auth & sync states
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [syncStatus, setSyncStatus] = useState('Local only');
+
   // Navigation
   const [currentTab, setCurrentTab] = useState<'home' | 'ledger' | 'approvals' | 'settings'>('home');
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
@@ -494,6 +502,42 @@ function MainApp() {
         setRole(r);
       }
     }
+
+    // Initialize Firebase authentication listener
+    const { auth } = require('./services/firebase');
+    const { onAuthStateChanged } = require('firebase/auth');
+    
+    let unsubscribeSync: (() => void) | null = null;
+    
+    const unsubscribeAuth = onAuthStateChanged(auth, (user: any) => {
+      setCurrentUser(user);
+      if (user) {
+        setSyncStatus('Connected & Synced');
+        // Register sync callback to refresh local UI states when remote sync pulls changes
+        firebaseService.registerSyncCallback(() => {
+          refreshData();
+        });
+        
+        // Start listening to Firestore in realtime
+        unsubscribeSync = firebaseService.setupFirestoreListeners(user.uid);
+        
+        // Trigger initial local state push to cloud
+        firebaseService.pushLocalStateToFirestore();
+      } else {
+        setSyncStatus('Local only');
+        if (unsubscribeSync) {
+          unsubscribeSync();
+          unsubscribeSync = null;
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSync) {
+        unsubscribeSync();
+      }
+    };
   }, []);
 
   // --- Chat Screen Effects ---
@@ -530,6 +574,8 @@ function MainApp() {
       window.localStorage.setItem('logit_lang', language);
       window.localStorage.setItem('logit_role', role);
     }
+    // Sign in anonymously to connect to Firebase Firestore
+    firebaseService.loginAnonymously().catch((e) => console.warn("Failed anonymous signin", e));
   };
 
   const handleToggleLanguage = () => {
@@ -1826,6 +1872,118 @@ function MainApp() {
               <TouchableOpacity style={styles.toggleBtnWide} activeOpacity={0.7} onPress={handleToggleRole}>
                 <Text style={styles.toggleBtnWideText}>{t.toggleRole}</Text>
               </TouchableOpacity>
+            </View>
+
+            {/* Firebase Sync & Account */}
+            <View style={styles.settingsGroup}>
+              <Text style={styles.settingsLabel}>Firebase Cloud Sync</Text>
+              {currentUser ? (
+                <View>
+                  <Text style={styles.listItem}>Status: {syncStatus}</Text>
+                  <Text style={styles.listItem}>Account: {currentUser.isAnonymous ? "Guest Session (Anonymous)" : currentUser.email}</Text>
+                  
+                  {!currentUser.isAnonymous && (
+                    <Text style={[styles.listItem, { color: colors.accent, fontWeight: '600', marginTop: 4 }]}>
+                      ✓ Connected to Firestore 'logit-db'
+                    </Text>
+                  )}
+
+                  <TouchableOpacity 
+                    style={[styles.toggleBtnWide, { marginTop: 12, borderColor: '#ef4444' }]} 
+                    activeOpacity={0.7} 
+                    onPress={async () => {
+                      try {
+                        await firebaseService.logout();
+                      } catch (e: any) {
+                        Alert.alert("Logout Failed", e.message);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.toggleBtnWideText, { color: '#ef4444' }]}>Log Out</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.listItem}>Sync your bookkeeping data securely in the cloud.</Text>
+                  
+                  {authError ? <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 8 }}>{authError}</Text> : null}
+
+                  <TextInput
+                    style={[styles.modalInput, { marginBottom: 10 }]}
+                    placeholder="Email Address"
+                    placeholderTextColor={colors.secondaryText}
+                    value={emailInput}
+                    onChangeText={setEmailInput}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  <TextInput
+                    style={[styles.modalInput, { marginBottom: 12 }]}
+                    placeholder="Password"
+                    placeholderTextColor={colors.secondaryText}
+                    value={passwordInput}
+                    onChangeText={setPasswordInput}
+                    secureTextEntry
+                  />
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <TouchableOpacity 
+                      style={[styles.themeSelectorBtn, { marginRight: 4 }]} 
+                      onPress={async () => {
+                        if (!emailInput || !passwordInput) {
+                          setAuthError("Please enter email and password");
+                          return;
+                        }
+                        setAuthError('');
+                        try {
+                          await firebaseService.loginWithEmail(emailInput, passwordInput);
+                          setEmailInput('');
+                          setPasswordInput('');
+                        } catch (e: any) {
+                          setAuthError(e.message || "Failed to log in");
+                        }
+                      }}
+                    >
+                      <Text style={[styles.themeSelectorBtnText, { color: colors.accent }]}>Sign In</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.themeSelectorBtn, { marginLeft: 4 }]} 
+                      onPress={async () => {
+                        if (!emailInput || !passwordInput) {
+                          setAuthError("Please enter email and password");
+                          return;
+                        }
+                        setAuthError('');
+                        try {
+                          await firebaseService.registerWithEmail(emailInput, passwordInput, role, language);
+                          setEmailInput('');
+                          setPasswordInput('');
+                        } catch (e: any) {
+                          setAuthError(e.message || "Failed to register");
+                        }
+                      }}
+                    >
+                      <Text style={[styles.themeSelectorBtnText, { color: colors.accent }]}>Create Account</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity 
+                    style={[styles.toggleBtnWide, { marginTop: 12 }]} 
+                    activeOpacity={0.7} 
+                    onPress={async () => {
+                      setAuthError('');
+                      try {
+                        await firebaseService.loginAnonymously();
+                      } catch (e: any) {
+                        setAuthError(e.message || "Failed to sign in anonymously");
+                      }
+                    }}
+                  >
+                    <Text style={styles.toggleBtnWideText}>Try Anonymously</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Shop List */}
