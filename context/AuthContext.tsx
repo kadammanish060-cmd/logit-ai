@@ -15,7 +15,8 @@ interface AuthContextType {
   setLanguage: (lang: 'en' | 'mr') => void;
   loginWithEmail: (e: string, p: string) => Promise<User>;
   registerWithEmail: (e: string, p: string, r?: 'admin' | 'normal', l?: 'en' | 'mr') => Promise<User>;
-  loginWithGoogle: () => Promise<User>;
+  loginWithGoogle: (idToken?: string, accessToken?: string) => Promise<User>;
+  loginAnonymously: () => Promise<User>;
   logout: () => Promise<void>;
 }
 
@@ -112,10 +113,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (idToken?: string, accessToken?: string) => {
     setLoading(true);
     try {
-      const u = await AuthService.loginWithGoogle();
+      const u = await AuthService.loginWithGoogle(idToken, accessToken);
+      await SessionManager.saveSession(true, role, language);
+      return u;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginAnonymously = async () => {
+    setLoading(true);
+    try {
+      const u = await firebaseService.loginAnonymously();
       await SessionManager.saveSession(true, role, language);
       return u;
     } finally {
@@ -146,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithEmail,
         registerWithEmail,
         loginWithGoogle,
+        loginAnonymously,
         logout,
       }}
     >

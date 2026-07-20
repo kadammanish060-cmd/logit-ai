@@ -9,19 +9,39 @@ import {
   Platform,
   Alert 
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../styles/theme';
+import { useTheme, Theme } from '../styles/theme';
 import { ShieldAlert, User, LogIn, Mail, Lock } from 'lucide-react-native';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, loginWithEmail, registerWithEmail, loginWithGoogle, loginAnonymously, role, language } = useAuth() as any;
-  const { colors, Theme } = useTheme();
+  const { colors } = useTheme();
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '541443181134-web.apps.googleusercontent.com',
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  });
+
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token, access_token } = response.params;
+      setActionLoading(true);
+      loginWithGoogle(id_token, access_token)
+        .catch((e: any) => setAuthError(e.message || 'Google sign in failed.'))
+        .finally(() => setActionLoading(false));
+    }
+  }, [response]);
 
   if (loading) {
     return (
@@ -62,7 +82,11 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     setAuthError('');
     setActionLoading(true);
     try {
-      await loginWithGoogle();
+      if (Platform.OS === 'web') {
+        await loginWithGoogle();
+      } else {
+        await promptAsync();
+      }
     } catch (e: any) {
       setAuthError(e.message || 'Google sign in failed.');
     } finally {

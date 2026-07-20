@@ -4,9 +4,11 @@ import {
   signOut,
   sendPasswordResetEmail,
   GoogleAuthProvider,
+  signInWithCredential,
   signInWithPopup,
   User
 } from 'firebase/auth';
+import { Platform } from 'react-native';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
@@ -63,13 +65,23 @@ export class AuthService {
   }
 
   /**
-   * Sign in using Google Auth Provider
+   * Sign in using Google Auth Provider (supports idToken from expo-auth-session and Web fallback)
    */
-  static async loginWithGoogle(): Promise<User> {
+  static async loginWithGoogle(idToken?: string, accessToken?: string): Promise<User> {
     try {
-      const provider = new GoogleAuthProvider();
-      const credential = await signInWithPopup(auth, provider);
-      const user = credential.user;
+      let user: User;
+
+      if (idToken) {
+        const credential = GoogleAuthProvider.credential(idToken, accessToken);
+        const result = await signInWithCredential(auth, credential);
+        user = result.user;
+      } else if (Platform.OS === 'web') {
+        const provider = new GoogleAuthProvider();
+        const credential = await signInWithPopup(auth, provider);
+        user = credential.user;
+      } else {
+        throw new Error("Google Sign-In on native requires an idToken from expo-auth-session.");
+      }
 
       // Check if user profile already exists, if not create default
       const userDocRef = doc(db, "users", user.uid);
