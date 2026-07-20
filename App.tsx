@@ -338,7 +338,7 @@ function MainApp() {
     loginWithEmail: handleLoginEmail,
     registerWithEmail: handleRegisterEmail,
     loginAnonymously: handleLoginAnonymously
-  } = useAuth() as any;
+  } = useAuth();
   const [hasOnboarded, setHasOnboarded] = useState(true);
   const [syncStatus, setSyncStatus] = useState('Connected & Synced');
   const [emailInput, setEmailInput] = useState('');

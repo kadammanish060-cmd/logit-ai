@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { AuthService, UserProfile } from '../services/AuthService';
 import { SessionManager } from '../services/SessionManager';
@@ -70,7 +71,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
           setUserProfile(profile);
           try {
-            const { doc, setDoc } = require('firebase/firestore');
             await setDoc(doc(db, "users", currentUser.uid), profile);
           } catch (e) {
             console.warn("Failed to write default user profile to Firestore", e);
