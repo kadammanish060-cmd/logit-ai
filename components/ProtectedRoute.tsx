@@ -28,6 +28,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [actionLoading, setActionLoading] = useState(false);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    scheme: 'logitai',
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '541443181134-web.apps.googleusercontent.com',
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,

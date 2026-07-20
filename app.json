@@ -2,6 +2,7 @@
   "expo": {
     "name": "logit-ai",
     "slug": "logit-ai",
+    "scheme": "logitai",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -37,7 +38,8 @@
           "microphonePermission": "Allow Logit AI to access your microphone to record audio."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ]
   }
 }
