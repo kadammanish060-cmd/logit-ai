@@ -69,6 +69,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             updatedAt: new Date().toISOString()
           };
           setUserProfile(profile);
+          try {
+            const { doc, setDoc } = require('firebase/firestore');
+            await setDoc(doc(db, "users", currentUser.uid), profile);
+          } catch (e) {
+            console.warn("Failed to write default user profile to Firestore", e);
+          }
         }
 
         // Start listening to Firestore remote changes for this user

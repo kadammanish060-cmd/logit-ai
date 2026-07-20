@@ -1,60 +1,64 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Check if user is authenticated
+    // Helper function to check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Check if user is accessing their own document by path id
+
+    // Helper function to check if authenticated user owns the document path ID
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Check if user is accessing data tagged with their userId
-    function isDataOwner() {
-      return isAuthenticated() && (
-        (resource == null && request.resource.data.userId == request.auth.uid) ||
-        (resource != null && resource.data.userId == request.auth.uid)
-      );
-    }
-
-    // users collection
+    // users collection: user can read & write their own profile
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
 
-    // shops collection
+    // shops collection: user can read, create, update, delete their own shops
     match /shops/{shopId} {
-      allow read, create, update, delete: if isDataOwner();
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
     }
 
     // transactions collection
     match /transactions/{transactionId} {
-      allow read, create, update, delete: if isDataOwner();
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
     }
 
     // receipts collection
     match /receipts/{receiptId} {
-      allow read, create, update, delete: if isDataOwner();
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
     }
 
     // voiceSessions collection
     match /voiceSessions/{sessionId} {
-      allow read, create, update, delete: if isDataOwner();
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
     }
 
     // approvals collection
     match /approvals/{approvalId} {
-      allow read, create, update, delete: if isDataOwner();
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
     }
 
     // settings collection
     match /settings/{settingId} {
-      allow read, create, update, delete: if isOwner(settingId) || isDataOwner();
+      allow read, delete: if isOwner(settingId) || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isOwner(settingId) || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
+      allow update: if isOwner(settingId) || (isAuthenticated() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid);
     }
 
-    // Default lock down for any other collection
+    // Lock down any other unlisted document
     match /{document=**} {
       allow read, write: if false;
     }
