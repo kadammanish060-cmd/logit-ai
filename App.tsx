@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import * as db from './services/db';
 import * as firebaseService from './services/firebaseService';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { processVoiceInput } from './services/gemini';
 import { startContinuousListening, synthesizeSpeech } from './services/voice';
 import { Theme, useTheme, ThemeProvider, DarkColors, ThemeType } from './styles/theme';
@@ -325,17 +327,23 @@ function MainApp() {
     };
   });
 
-  // Onboarding Settings
-  const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [language, setLanguage] = useState<'en' | 'mr'>('en');
-  const [role, setRole] = useState<'admin' | 'normal'>('admin');
-
-  // Firebase auth & sync states
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  // Onboarding & Auth Context
+  const { 
+    user: currentUser, 
+    role, 
+    language, 
+    setRole, 
+    setLanguage, 
+    logout: handleLogoutAuth,
+    loginWithEmail: handleLoginEmail,
+    registerWithEmail: handleRegisterEmail,
+    loginAnonymously: handleLoginAnonymously
+  } = useAuth() as any;
+  const [hasOnboarded, setHasOnboarded] = useState(true);
+  const [syncStatus, setSyncStatus] = useState('Connected & Synced');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
-  const [syncStatus, setSyncStatus] = useState('Local only');
 
   // Navigation
   const [currentTab, setCurrentTab] = useState<'home' | 'ledger' | 'approvals' | 'settings'>('home');
@@ -487,57 +495,10 @@ function MainApp() {
     db.loadDatabase();
     refreshData();
     
-    // Load onboarded settings
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const onboarded = window.localStorage.getItem('logit_onboarded');
-      const lang = window.localStorage.getItem('logit_lang');
-      const r = window.localStorage.getItem('logit_role');
-      if (onboarded === 'true') {
-        setHasOnboarded(true);
-      }
-      if (lang === 'en' || lang === 'mr') {
-        setLanguage(lang);
-      }
-      if (r === 'admin' || r === 'normal') {
-        setRole(r);
-      }
-    }
-
-    // Initialize Firebase authentication listener
-    const { auth } = require('./services/firebase');
-    const { onAuthStateChanged } = require('firebase/auth');
-    
-    let unsubscribeSync: (() => void) | null = null;
-    
-    const unsubscribeAuth = onAuthStateChanged(auth, (user: any) => {
-      setCurrentUser(user);
-      if (user) {
-        setSyncStatus('Connected & Synced');
-        // Register sync callback to refresh local UI states when remote sync pulls changes
-        firebaseService.registerSyncCallback(() => {
-          refreshData();
-        });
-        
-        // Start listening to Firestore in realtime
-        unsubscribeSync = firebaseService.setupFirestoreListeners(user.uid);
-        
-        // Trigger initial local state push to cloud
-        firebaseService.pushLocalStateToFirestore();
-      } else {
-        setSyncStatus('Local only');
-        if (unsubscribeSync) {
-          unsubscribeSync();
-          unsubscribeSync = null;
-        }
-      }
+    // Register sync callback to refresh local UI states when remote sync pulls changes
+    firebaseService.registerSyncCallback(() => {
+      refreshData();
     });
-
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeSync) {
-        unsubscribeSync();
-      }
-    };
   }, []);
 
   // --- Chat Screen Effects ---
@@ -1893,7 +1854,7 @@ function MainApp() {
                     activeOpacity={0.7} 
                     onPress={async () => {
                       try {
-                        await firebaseService.logout();
+                        await handleLogoutAuth();
                       } catch (e: any) {
                         Alert.alert("Logout Failed", e.message);
                       }
@@ -1936,7 +1897,7 @@ function MainApp() {
                         }
                         setAuthError('');
                         try {
-                          await firebaseService.loginWithEmail(emailInput, passwordInput);
+                          await handleLoginEmail(emailInput, passwordInput);
                           setEmailInput('');
                           setPasswordInput('');
                         } catch (e: any) {
@@ -1956,7 +1917,7 @@ function MainApp() {
                         }
                         setAuthError('');
                         try {
-                          await firebaseService.registerWithEmail(emailInput, passwordInput, role, language);
+                          await handleRegisterEmail(emailInput, passwordInput, role, language);
                           setEmailInput('');
                           setPasswordInput('');
                         } catch (e: any) {
@@ -1974,7 +1935,7 @@ function MainApp() {
                     onPress={async () => {
                       setAuthError('');
                       try {
-                        await firebaseService.loginAnonymously();
+                        await handleLoginAnonymously();
                       } catch (e: any) {
                         setAuthError(e.message || "Failed to sign in anonymously");
                       }
@@ -3320,7 +3281,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <MainApp />
+        <AuthProvider>
+          <ProtectedRoute>
+            <MainApp />
+          </ProtectedRoute>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

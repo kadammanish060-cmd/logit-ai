@@ -86,13 +86,21 @@ export async function logout() {
 
 // 2. Storage upload with robust local fallback if Cloud Storage is not enabled
 export async function uploadFile(folder: 'receipts' | 'voice' | 'documents', fileUri: string): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) {
+    console.warn("Storage upload attempted without an authenticated user.");
+    return fileUri;
+  }
+  const uid = user.uid;
+
   if (Platform.OS === 'web') {
     // Web environment: fileUri is already a blob/dataUrl or objectURL
     try {
       const response = await fetch(fileUri);
       const blob = await response.blob();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      const fileRef = ref(storage, `${folder}/${fileName}`);
+      // Upload inside user's folder folder/{uid}/{fileName}
+      const fileRef = ref(storage, `${folder}/${uid}/${fileName}`);
       await uploadBytes(fileRef, blob);
       return await getDownloadURL(fileRef);
     } catch (e) {
@@ -105,7 +113,8 @@ export async function uploadFile(folder: 'receipts' | 'voice' | 'documents', fil
       const response = await fetch(fileUri);
       const blob = await response.blob();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      const fileRef = ref(storage, `${folder}/${fileName}`);
+      // Upload inside user's folder folder/{uid}/{fileName}
+      const fileRef = ref(storage, `${folder}/${uid}/${fileName}`);
       await uploadBytes(fileRef, blob);
       return await getDownloadURL(fileRef);
     } catch (e) {
@@ -122,8 +131,13 @@ let isSyncingFromRemote = false;
 export function setupFirestoreListeners(userId: string) {
   const localDb = require('./db');
 
+  // Query only items belonging to this user
+  const qShops = query(collection(db, "shops"), where("userId", "==", userId));
+  const qTransactions = query(collection(db, "transactions"), where("userId", "==", userId));
+  const qApprovals = query(collection(db, "approvals"), where("userId", "==", userId));
+
   // Listen to shops
-  const unsubscribeShops = onSnapshot(collection(db, "shops"), (snapshot) => {
+  const unsubscribeShops = onSnapshot(qShops, (snapshot) => {
     if (isSyncingFromRemote) return;
     isSyncingFromRemote = true;
     snapshot.forEach((doc) => {
@@ -135,7 +149,7 @@ export function setupFirestoreListeners(userId: string) {
   });
 
   // Listen to transactions
-  const unsubscribeTransactions = onSnapshot(collection(db, "transactions"), (snapshot) => {
+  const unsubscribeTransactions = onSnapshot(qTransactions, (snapshot) => {
     if (isSyncingFromRemote) return;
     isSyncingFromRemote = true;
     snapshot.forEach((doc) => {
@@ -147,7 +161,7 @@ export function setupFirestoreListeners(userId: string) {
   });
 
   // Listen to approvals
-  const unsubscribeApprovals = onSnapshot(collection(db, "approvals"), (snapshot) => {
+  const unsubscribeApprovals = onSnapshot(qApprovals, (snapshot) => {
     if (isSyncingFromRemote) return;
     isSyncingFromRemote = true;
     snapshot.forEach((doc) => {
@@ -169,6 +183,7 @@ export function setupFirestoreListeners(userId: string) {
 export async function pushLocalStateToFirestore() {
   const user = auth.currentUser;
   if (!user) return;
+  const uid = user.uid;
 
   const localDb = require('./db');
   const state = localDb.getLocalState();
@@ -182,6 +197,7 @@ export async function pushLocalStateToFirestore() {
       const shopRef = doc(db, "shops", shopId);
       batch.set(shopRef, {
         ...shop,
+        userId: uid,
         updatedAt: new Date().toISOString()
       });
     }
@@ -208,6 +224,7 @@ export async function pushLocalStateToFirestore() {
             transcript: item.transcript || "",
             notes: item.notes || "",
             receiptUrl: item.receiptUrl || "",
+            userId: uid,
             updatedAt: new Date().toISOString()
           });
         }
@@ -230,6 +247,7 @@ export async function pushLocalStateToFirestore() {
           source: pay.source || "manual",
           notes: pay.notes || "",
           receiptUrl: pay.receiptUrl || "",
+          userId: uid,
           updatedAt: new Date().toISOString()
         });
       }
@@ -248,6 +266,7 @@ export async function pushLocalStateToFirestore() {
           quantity: purchase.quantity,
           amount: purchase.pricePaid,
           loggedAt: purchase.loggedAt,
+          userId: uid,
           updatedAt: new Date().toISOString()
         });
       }
@@ -259,6 +278,7 @@ export async function pushLocalStateToFirestore() {
       const appRef = doc(db, "approvals", appId);
       batch.set(appRef, {
         ...app,
+        userId: uid,
         updatedAt: new Date().toISOString()
       });
     }

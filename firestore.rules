@@ -1,64 +1,57 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
     
+    // Check if user is accessing their own document by path id
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
+    // Check if user is accessing data tagged with their userId
+    function isDataOwner() {
+      return isAuthenticated() && (
+        (resource == null && request.resource.data.userId == request.auth.uid) ||
+        (resource != null && resource.data.userId == request.auth.uid)
+      );
     }
 
     // users collection
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId);
     }
 
     // shops collection
     match /shops/{shopId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, create, update, delete: if isDataOwner();
     }
 
     // transactions collection
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (resource.data.userId == request.auth.uid);
+      allow read, create, update, delete: if isDataOwner();
     }
 
     // receipts collection
     match /receipts/{receiptId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin() || (resource.data.userId == request.auth.uid);
+      allow read, create, update, delete: if isDataOwner();
     }
 
     // voiceSessions collection
     match /voiceSessions/{sessionId} {
-      allow read, write: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow read, create, update, delete: if isDataOwner();
     }
 
     // approvals collection
     match /approvals/{approvalId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow read, create, update, delete: if isDataOwner();
     }
 
     // settings collection
     match /settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, create, update, delete: if isOwner(settingId) || isDataOwner();
     }
 
     // Default lock down for any other collection

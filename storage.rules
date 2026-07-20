@@ -1,22 +1,22 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // receipts/ folder: authenticated access
-    match /receipts/{allPaths=**} {
-      allow read, write: if request.auth != null;
+    // receipts/{uid}/ folder
+    match /receipts/{uid}/{fileName=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
     
-    // voice/ folder: authenticated access
-    match /voice/{allPaths=**} {
-      allow read, write: if request.auth != null;
+    // voice/{uid}/ folder
+    match /voice/{uid}/{fileName=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
     
-    // documents/ folder: authenticated access
-    match /documents/{allPaths=**} {
-      allow read, write: if request.auth != null;
+    // documents/{uid}/ folder
+    match /documents/{uid}/{fileName=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
     
-    // Fallback: deny everything else
+    // Deny all other paths
     match /{allPaths=**} {
       allow read, write: if false;
     }
