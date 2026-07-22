@@ -18,8 +18,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with the custom database ID "logit-db"
-const db = initializeFirestore(app, {}, process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || 'logit-db');
+// Initialize Firestore with default database ID "(default)"
+const db = initializeFirestore(app, {}, process.env.EXPO_PUBLIC_FIREBASE_DATABASE_ID || '(default)');
 
 // Initialize Auth with platform-appropriate persistence
 const auth = Platform.OS === 'web'
