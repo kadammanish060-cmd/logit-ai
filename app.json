@@ -3,7 +3,7 @@
     "name": "logit-ai",
     "slug": "logit-ai",
     "scheme": "logitai",
-    "version": "1.0.0",
+    "version": "0.1.0-beta",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
